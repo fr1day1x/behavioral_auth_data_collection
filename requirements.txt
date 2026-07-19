@@ -1,6 +1,5 @@
-pygame==2.5.2
-flask==3.0.3
-numpy==1.26.4
-scipy==1.13.0
-scikit-learn==1.4.2
-cryptography==42.0.8
+fastapi
+uvicorn
+pymongo
+dnspython
+pydantic
