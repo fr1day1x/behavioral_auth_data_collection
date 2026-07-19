@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Behavior Authentication </title>
+    <title>Data Harvesting Engine</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -99,7 +99,6 @@
             padding-left: 10%;
         }
 
-        /* The 4x4 Dot Canvas Arena */
         #canvas-container {
             position: relative;
             width: 600px;
@@ -128,7 +127,7 @@
 <body>
 
     <div id="menu-view">
-        <h1>Behavior Authentication</h1>
+        <h1>Data Harvesting Engine</h1>
         <div class="input-group">
             <input type="text" id="participant-id" placeholder="ENTER ID" maxlength="10" autocomplete="off">
         </div>
@@ -147,8 +146,6 @@
     </div>
 
     <script>
-
-        // --- GAME STATE MATRIX ---
         let appState = "MENU";
         let participantId = "";
         let currentMode = ""; 
@@ -157,7 +154,6 @@
         let roundsCompleted = 0;
         let maxRounds = 5;
         
-        // The master array that holds all completed rounds before transmission
         let sessionRounds = [];
         
         const gridPositions = [];
@@ -207,26 +203,22 @@
         async function handleAction(id, mode) {
             if (!id) { showFeedback("Error: ID string required.", "var(--error-color)"); return; }
             
-            // Tell the user we are pinging the cloud
             showFeedback("Checking database...", "var(--text-secondary)");
 
             try {
-                // 1. Ping the new Python pre-flight endpoint
                 const response = await fetch(`/check/${id}`);
                 const data = await response.json();
 
-                // 2. Evaluate the Rules of Engagement
                 if (mode === "VERIFY" && !data.exists) {
                     showFeedback("Error: User not found. Please enroll first.", "var(--error-color)");
-                    return; // Kills the function, game never starts
+                    return;
                 }
 
                 if (mode === "ENROLL" && data.exists) {
                     showFeedback("Error: ID already exists in Cloud. Pick a new one.", "var(--error-color)");
-                    return; // Kills the function, game never starts
+                    return;
                 }
 
-                // 3. If the checks pass, clear the feedback and start the game!
                 showFeedback("", "transparent");
                 participantId = id;
                 currentMode = mode;
@@ -245,7 +237,6 @@
 
         function startNewRound() {
             targetsHit = 0;
-            // Clear ONLY the current round's recorder object
             rawSessionData = {
                 reaction_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
                 itis: { Adjacent: [], Diagonal: [], Medium: [], Long: [] },
@@ -384,7 +375,6 @@
         }
 
         function processRoundCompletion() {
-            // CRITICAL FIX: Save the completed round data into the master array before starting a new round
             sessionRounds.push(rawSessionData);
             
             roundsCompleted++;
@@ -405,16 +395,12 @@
         }
 
         async function sendPayloadToCloud() {
-
-            console.log("DEBUG: Inspecting the rounds array:", sessionRounds);
-            
             const payload = {
                 participant_id: participantId,
                 mode: currentMode,
-                rounds: sessionRounds // Now contains all 5 historical rounds
+                rounds: sessionRounds
             };
             
-            console.log("Transmitting to Backend:", payload);
             showFeedback(`Transmitting biometric vectors...`, "var(--text-secondary)");
 
             try {

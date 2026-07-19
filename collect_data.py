@@ -19,7 +19,7 @@ ERROR_COLOR = (255, 60, 60)      # Alert Red
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))
-pygame.display.set_caption("BehaviorAuth - Distributed Research Harvester")
+pygame.display.set_caption("Data Harvesting Engine - Desktop Client")
 recorder = SessionRecorder()
 
 font = pygame.font.SysFont('segoeui, helvetica, arial', 44, bold=True)
@@ -152,17 +152,16 @@ while running:
                                 target_spawn_time = pygame.time.get_ticks()
                                 last_click_time = target_spawn_time
                             else:
-                                # Packaging full data payload
+                                # --- ALIGNED WITH SESSIONPAYLOAD ENGINES ---
                                 payload = {
-                                    "participant_id": participant_id,
-                                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                    "sessions": all_sessions_raw
+                                    "participant_id": participant_id.upper(),
+                                    "mode": "ENROLL",
+                                    "rounds": all_sessions_raw
                                 }
                                 
-                                # CHANGE THIS: Replace with your actual cloud backend URL once deployed
-                                server_url = "http://localhost:8000/submit-session"
+                                # Targeted live ingestion API gateway URL
+                                server_url = "https://behavioral-auth-data-collection.onrender.com/enroll"
                                 headers = {
-                                    "X-Research-Token": "your_shared_secret_research_key_here",
                                     "Content-Type": "application/json"
                                 }
                                 
@@ -178,7 +177,6 @@ while running:
                                 except Exception as network_err:
                                     print(f"[NETWORK ERROR] {network_err} -> Activating emergency cache recovery...")
                                     
-                                    # Emergency Fallback: Write immediately to localized backup text record
                                     backup_filename = f"emergency_backup_{participant_id}_{int(current_time)}.json"
                                     with open(backup_filename, "w") as backup_f:
                                         json.dump(payload, backup_f, indent=4)
