@@ -6,13 +6,13 @@
     <title>Data Harvesting Engine</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --text-primary: #f0f0f0;
-            --text-secondary: #969696;
-            --target-color: #00ffaa;
-            --target-shadow: rgba(0, 255, 170, 0.2);
+            --bg-color: #0e1016; /* Matched to Pygame BG_COLOR */
+            --text-primary: #e6ebf5; /* Matched to Pygame TEXT_PRIMARY */
+            --text-secondary: #6e788c; /* Matched to Pygame TEXT_SECONDARY */
+            --target-color: #00c8ff; /* Matched to Pygame TARGET_COLOR */
+            --target-shadow: rgba(0, 70, 100, 0.4); /* Matched to Pygame TARGET_SHADOW */
             --error-color: #ff3c3c;
-            --success-color: #28c850;
+            --success-color: #00ff78; /* Matched to Pygame SUCCESS_COLOR */
         }
 
         body {
@@ -45,44 +45,35 @@
             font-size: 3rem;
             margin-bottom: 2rem;
             letter-spacing: -1px;
+            font-weight: bold;
         }
 
         .input-group {
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             text-align: center;
+            font-size: 1.5rem;
+        }
+
+        .input-label {
+            color: var(--text-primary);
+            margin-right: 0.5rem;
         }
 
         input {
             background: transparent;
             border: none;
-            border-bottom: 2px solid var(--target-color);
             color: var(--target-color);
-            font-size: 1.8rem;
-            text-align: center;
-            padding: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
             outline: none;
             text-transform: uppercase;
+            width: 250px;
         }
 
-        .btn-container {
-            display: flex;
-            gap: 1.5rem;
-        }
-
-        button {
-            background: #1f1f1f;
-            border: 1px solid #333;
-            color: var(--text-primary);
-            padding: 1rem 2rem;
+        .hint-text {
+            color: var(--text-secondary);
             font-size: 1.2rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        button:hover {
-            border-color: var(--target-color);
-            box-shadow: 0 0 10px var(--target-shadow);
+            margin-top: 1rem;
         }
 
         #feedback-msg {
@@ -96,16 +87,17 @@
             color: var(--text-secondary);
             margin-bottom: 1.5rem;
             align-self: flex-start;
-            padding-left: 10%;
+            padding-left: 5%;
         }
 
+        /* The 4x4 Dot Arena Layout matching Pygame proportions */
         #canvas-container {
             position: relative;
             width: 600px;
             height: 600px;
-            background: #181818;
+            background: #121620;
             border-radius: 12px;
-            border: 1px solid #222;
+            border: 1px solid #1f2535;
         }
 
         #target-dot {
@@ -116,7 +108,7 @@
             border-radius: 50%;
             cursor: pointer;
             transform: translate(-50%, -50%);
-            box-shadow: 0 0 20px var(--target-color);
+            box-shadow: 0 0 20px var(--target-shadow);
             transition: top 0.1s ease, left 0.1s ease;
         }
 
@@ -126,36 +118,37 @@
 </head>
 <body>
 
+    <!-- Menu Interface perfectly matching the desktop client screenshot -->
     <div id="menu-view">
         <h1>Data Harvesting Engine</h1>
         <div class="input-group">
-            <input type="text" id="participant-id" placeholder="ENTER ID" maxlength="10" autocomplete="off">
+            <span class="input-label">Enter Subject ID:</span>
+            <input type="text" id="participant-id" maxlength="10" autocomplete="off" autofocus>
         </div>
-        <div class="btn-container">
-            <button id="enroll-btn">Enroll System [E]</button>
-            <button id="verify-btn">Verify Portal [V]</button>
-        </div>
+        <div class="hint-text">Press [ENTER] to execute data acquisition</div>
         <div id="feedback-msg"></div>
     </div>
 
+    <!-- Active Gameplay View -->
     <div id="game-view" class="hidden">
-        <div id="status-overlay">MODE: <span id="mode-text">-</span> | Round <span id="round-text">0/0</span> | Target <span id="target-text">0/0</span></div>
+        <div id="status-overlay">HARVESTING DATA - Profile: <span id="profile-text">-</span> | Round <span id="round-text">0/0</span> | Target <span id="target-text">0/0</span></div>
         <div id="canvas-container">
             <div id="target-dot" class="hidden"></div>
         </div>
     </div>
 
     <script>
+        // --- DATA HARVESTING ENGINE PARAMETERS ---
         let appState = "MENU";
         let participantId = "";
-        let currentMode = ""; 
         let targetsHit = 0;
-        const maxTargets = 15;
+        const maxTargets = 40; // Updated to match desktop telemetry specifications
         let roundsCompleted = 0;
-        let maxRounds = 5;
+        const maxRounds = 3;   // Updated to match desktop telemetry specifications
         
         let sessionRounds = [];
         
+        // Dynamic grid coordination matrices
         const gridPositions = [];
         const startX = 150, startY = 150, spacing = 100;
         for(let r=0; r<4; r++) {
@@ -181,52 +174,38 @@
         const menuView = document.getElementById('menu-view');
         const gameView = document.getElementById('game-view');
         const idInput = document.getElementById('participant-id');
-        const enrollBtn = document.getElementById('enroll-btn');
-        const verifyBtn = document.getElementById('verify-btn');
         const feedbackMsg = document.getElementById('feedback-msg');
         const targetDot = document.getElementById('target-dot');
         const canvasContainer = document.getElementById('canvas-container');
 
+        // Capture enter key transaction to boot data acquisition
         window.addEventListener('keydown', (e) => {
             if (appState !== "MENU") return;
-            if (document.activeElement === idInput) {
-                if (e.key === "Enter") handleAction(idInput.value.trim().toUpperCase(), "ENROLL");
-                return;
+            if (e.key === "Enter") {
+                const idValue = idInput.value.trim().toUpperCase();
+                if (idValue.length > 0) {
+                    executeDataAcquisition(idValue);
+                } else {
+                    showFeedback("Error: Subject ID string required.", "var(--error-color)");
+                }
             }
-            if (e.key.toLowerCase() === 'e') handleAction(idInput.value.trim().toUpperCase(), "ENROLL");
-            if (e.key.toLowerCase() === 'v') handleAction(idInput.value.trim().toUpperCase(), "VERIFY");
         });
 
-        enrollBtn.addEventListener('click', () => handleAction(idInput.value.trim().toUpperCase(), "ENROLL"));
-        verifyBtn.addEventListener('click', () => handleAction(idInput.value.trim().toUpperCase(), "VERIFY"));
-
-        async function handleAction(id, mode) {
-            if (!id) { showFeedback("Error: ID string required.", "var(--error-color)"); return; }
-            
-            showFeedback("Checking database...", "var(--text-secondary)");
+        async function executeDataAcquisition(id) {
+            showFeedback("Verifying network state...", "var(--text-secondary)");
 
             try {
+                // Pre-flight validation against database allocation indices
                 const response = await fetch(`/check/${id}`);
                 const data = await response.json();
 
-                if (mode === "VERIFY" && !data.exists) {
-                    showFeedback("Error: User not found. Please enroll first.", "var(--error-color)");
-                    return;
-                }
-
-                if (mode === "ENROLL" && data.exists) {
-                    showFeedback("Error: ID already exists in Cloud. Pick a new one.", "var(--error-color)");
-                    return;
-                }
-
                 showFeedback("", "transparent");
                 participantId = id;
-                currentMode = mode;
-                maxRounds = mode === "ENROLL" ? 5 : 1;
                 roundsCompleted = 0;
-                appState = mode;
-                
+                appState = "COLLECT";
                 sessionRounds = [];
+                
+                document.getElementById('profile-text').innerText = participantId;
                 startNewRound();
                 
             } catch (error) {
@@ -246,9 +225,7 @@
 
             menuView.classList.add('hidden');
             gameView.classList.remove('hidden');
-            document.getElementById('mode-text').innerText = currentMode;
             updateOverlay();
-
             spawnTarget(true);
         }
 
@@ -274,7 +251,7 @@
             }
             activeTargetIndex = newIndex;
 
-            const delay = isFirst ? 500 : Math.floor(Math.random() * 1000) + 500;
+            const delay = isFirst ? 500 : Math.floor(Math.random() * 800) + 400; // Aligned with desktop clock bounds
             setTimeout(() => {
                 const pos = gridPositions[activeTargetIndex];
                 targetDot.style.left = `${pos.x}px`;
@@ -351,10 +328,8 @@
 
         function handleTimeout() {
             rawSessionData.total_errors++;
-            console.log("TIMEOUT ACCRUED!");
             canvasContainer.classList.add('flash-red');
             setTimeout(() => canvasContainer.classList.remove('flash-red'), 150);
-            
             spawnTarget();
         }
 
@@ -376,20 +351,19 @@
 
         function processRoundCompletion() {
             sessionRounds.push(rawSessionData);
-            
             roundsCompleted++;
+            
             if (roundsCompleted < maxRounds) {
                 canvasContainer.classList.add('flash-green');
                 setTimeout(() => {
                     canvasContainer.classList.remove('flash-green');
                     startNewRound();
-                }, 2000);
+                }, 1500);
             } else {
-                showFeedback("Processing biometric vectors...", "var(--target-color)");
+                showFeedback("Transmitting biometric harvesting arrays...", "var(--target-color)");
                 gameView.classList.add('hidden');
                 menuView.classList.remove('hidden');
                 appState = "MENU";
-
                 sendPayloadToCloud();
             }
         }
@@ -397,16 +371,12 @@
         async function sendPayloadToCloud() {
             const payload = {
                 participant_id: participantId,
-                mode: currentMode,
+                mode: "ENROLL",
                 rounds: sessionRounds
             };
-            
-            showFeedback(`Transmitting biometric vectors...`, "var(--text-secondary)");
 
             try {
-                const endpoint = currentMode === "ENROLL" ? "/enroll" : "/verify";
-                
-                const response = await fetch(`${endpoint}`, {
+                const response = await fetch('/enroll', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -415,19 +385,13 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    if (currentMode === "VERIFY") {
-                        const color = data.match ? "var(--success-color)" : "var(--error-color)";
-                        const text = data.match ? `ACCEPTED! Score: ${data.score}` : `REJECTED! Score: ${data.score}`;
-                        showFeedback(text, color);
-                    } else {
-                        showFeedback(data.message, "var(--success-color)");
-                    }
+                    showFeedback(`Data safely logged for ${participantId}!`, "var(--success-color)");
+                    idInput.value = "";
                 } else {
                     showFeedback(`Error: ${data.detail}`, "var(--error-color)");
                 }
             } catch (error) {
                 showFeedback(`Connection failed. Is the server running?`, "var(--error-color)");
-                console.error("Fetch error:", error);
             }
         }
     </script>
