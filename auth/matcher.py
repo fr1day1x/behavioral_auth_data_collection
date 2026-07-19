@@ -1,27 +1,21 @@
-from auth.features import euclidean_distance
-from auth.template import load_template
-from config import AUTH_THRESHOLD
+import numpy as np
 
+# 1. Increased alpha to 0.1 to soften the rigid 5-round boundary
+def train_mahalanobis(enrollment_vectors, alpha=0.1):
+    template = np.mean(enrollment_vectors, axis=0)
+    cov_matrix = np.cov(enrollment_vectors, rowvar=False)
+    
+    regularized_cov = cov_matrix + alpha * np.eye(cov_matrix.shape[0])
+    inv_cov_matrix = np.linalg.inv(regularized_cov)
+    
+    return template, inv_cov_matrix
 
-def authenticate(participant_id, live_vector):
-    """
-    Compares a live feature vector against a stored template.
-
-    Returns:
-        result (bool): True if authenticated, False if rejected
-        distance (float): the Euclidean distance score
-        threshold (float): the threshold used
-    """
-    stored_template = load_template(participant_id)
-
-    if stored_template is None:
-        print(f"[Matcher] No template found for {participant_id}")
-        return False, None, AUTH_THRESHOLD
-
-    distance = euclidean_distance(stored_template, live_vector)
-    result = distance <= AUTH_THRESHOLD
-
-    print(f"[Matcher] Participant: {participant_id} | Distance: {distance:.4f} | "
-          f"Threshold: {AUTH_THRESHOLD} | Result: {'ACCEPTED' if result else 'REJECTED'}")
-
-    return result, distance, AUTH_THRESHOLD
+# 2. Increased threshold to 8.0 to account for 19 degrees of freedom
+def authenticate(live_vector, stored_template, inv_cov_matrix, threshold=8.0):
+    delta = live_vector - stored_template
+    distance = np.sqrt(np.dot(np.dot(delta, inv_cov_matrix), delta.T))
+    
+    if distance <= threshold:
+        return True, distance
+    else:
+        return False, distance

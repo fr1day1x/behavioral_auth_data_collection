@@ -1,55 +1,46 @@
 import numpy as np
 
-
 def extract_features(raw_data):
-    """
-    Extracts a 12-dimensional feature vector from raw recorder data.
+    features = []
 
-    4 signals x 3 descriptors (mean, std, median) = 12 dimensions
+    # Dimensions 1-4: Reaction Times (Keep all 4 buckets)
+    for bucket in ["Adjacent", "Diagonal", "Medium", "Long"]:
+        arr = raw_data["reaction_times"][bucket]
+        val = np.mean(arr) if len(arr) > 0 else 0.5  # Safety baseline instead of 0
+        features.append(val / 1000.0)
 
-    Signals:
-      1. inter_tap_intervals
-      2. reaction_latencies
-      3. spatial_accuracies
-      4. error_corrections
+    # Dimensions 5-8: Inter-Tap Intervals (Keep all 4 buckets)
+    for bucket in ["Adjacent", "Diagonal", "Medium", "Long"]:
+        arr = raw_data["itis"][bucket]
+        val = np.mean(arr) if len(arr) > 0 else 0.5
+        features.append(val / 2000.0)
 
-    Returns a numpy array of shape (12,)
-    """
-    signals = [
-        raw_data["inter_tap_intervals"],
-        raw_data["reaction_latencies"],
-        raw_data["spatial_accuracies"],
-        raw_data["error_corrections"],
-    ]
+    # --- PRUNING STARTS HERE ---
+    
+    # Old Dimensions 9-12 (Dwell Times): 
+    # Drop 9, 10, 11 because they clone each other. 
+    # Keep ONLY a single global average of ALL dwell times across the session.
+    all_dwells = []
+    for bucket in ["Adjacent", "Diagonal", "Medium", "Long"]:
+        all_dwells.extend(raw_data["dwell_times"][bucket])
+    
+    global_dwell_mean = np.mean(all_dwells) if len(all_dwells) > 0 else 90.0
+    features.append(global_dwell_mean / 200.0) # Now 1 feature instead of 4
 
-    vector = []
-    for signal in signals:
-        arr = np.array(signal, dtype=float)
-        if len(arr) == 0:
-            # If signal is empty, fill with zeros
-            vector.extend([0.0, 0.0, 0.0])
-        else:
-            vector.append(float(np.mean(arr)))
-            vector.append(float(np.std(arr)))
-            vector.append(float(np.median(arr)))
+    # Old Dimensions 13-15 (X-Axis Bias):
+    # Drop Median (index 14) because it's highly correlated with Mean. Keep Mean and Std.
+    x_arr = raw_data["x_offsets"]
+    features.append((np.mean(x_arr) / 40.0) if len(x_arr) > 0 else 0.0)
+    features.append((np.std(x_arr) / 40.0) if len(x_arr) > 0 else 0.0)
 
-    return np.array(vector, dtype=float)
+    # Old Dimensions 16-18 (Y-Axis Bias):
+    # Drop Median (index 17) because it's highly correlated with Mean. Keep Mean and Std.
+    y_arr = raw_data["y_offsets"]
+    features.append((np.mean(y_arr) / 40.0) if len(y_arr) > 0 else 0.0)
+    features.append((np.std(y_arr) / 40.0) if len(y_arr) > 0 else 0.0)
 
+    # Old Dimension 19: Errors
+    # Keep it to capture accuracy signature
+    features.append(raw_data["total_errors"] / 5.0)
 
-def average_vectors(vectors):
-    """
-    Averages multiple feature vectors into one template.
-    Used to combine 3 enrollment rounds into a single stored template.
-
-    vectors: list of numpy arrays of shape (12,)
-    Returns: numpy array of shape (12,)
-    """
-    return np.mean(vectors, axis=0)
-
-
-def euclidean_distance(vec_a, vec_b):
-    """
-    Computes normalized Euclidean distance between two feature vectors.
-    Normalizes by vector length to keep distance scale consistent.
-    """
-    return float(np.linalg.norm(vec_a - vec_b) / len(vec_a))
+    return np.array(features)

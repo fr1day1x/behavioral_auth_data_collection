@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Behavior Authentication </title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-primary: #f0f0f0;
+            --text-secondary: #969696;
+            --target-color: #00ffaa;
+            --target-shadow: rgba(0, 255, 170, 0.2);
+            --error-color: #ff3c3c;
+            --success-color: #28c850;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #menu-view, #game-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            letter-spacing: -1px;
+        }
+
+        .input-group {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--target-color);
+            color: var(--target-color);
+            font-size: 1.8rem;
+            text-align: center;
+            padding: 0.5rem;
+            outline: none;
+            text-transform: uppercase;
+        }
+
+        .btn-container {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        button {
+            background: #1f1f1f;
+            border: 1px solid #333;
+            color: var(--text-primary);
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            border-color: var(--target-color);
+            box-shadow: 0 0 10px var(--target-shadow);
+        }
+
+        #feedback-msg {
+            margin-top: 2rem;
+            font-size: 1.2rem;
+            height: 1.5rem;
+        }
+
+        #status-overlay {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            align-self: flex-start;
+            padding-left: 10%;
+        }
+
+        /* The 4x4 Dot Canvas Arena */
+        #canvas-container {
+            position: relative;
+            width: 600px;
+            height: 600px;
+            background: #181818;
+            border-radius: 12px;
+            border: 1px solid #222;
+        }
+
+        #target-dot {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background-color: var(--target-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 20px var(--target-color);
+            transition: top 0.1s ease, left 0.1s ease;
+        }
+
+        .flash-red { background-color: #401010 !important; }
+        .flash-green { background-color: #104020 !important; }
+    </style>
+</head>
+<body>
+
+    <div id="menu-view">
+        <h1>Behavior Authentication</h1>
+        <div class="input-group">
+            <input type="text" id="participant-id" placeholder="ENTER ID" maxlength="10" autocomplete="off">
+        </div>
+        <div class="btn-container">
+            <button id="enroll-btn">Enroll System [E]</button>
+            <button id="verify-btn">Verify Portal [V]</button>
+        </div>
+        <div id="feedback-msg"></div>
+    </div>
+
+    <div id="game-view" class="hidden">
+        <div id="status-overlay">MODE: <span id="mode-text">-</span> | Round <span id="round-text">0/0</span> | Target <span id="target-text">0/0</span></div>
+        <div id="canvas-container">
+            <div id="target-dot" class="hidden"></div>
+        </div>
+    </div>
+
+    <script>
+
+        // --- GAME STATE MATRIX ---
+        let appState = "MENU";
+        let participantId = "";
+        let currentMode = ""; 
+        let targetsHit = 0;
+        const maxTargets = 15;
+        let roundsCompleted = 0;
+        let maxRounds = 5;
+        
+        // The master array that holds all completed rounds before transmission
+        let sessionRounds = [];
+        
+        const gridPositions = [];
+        const startX = 150, startY = 150, spacing = 100;
+        for(let r=0; r<4; r++) {
+            for(let c=0; c<4; c++) {
+                gridPositions.push({ x: startX + c*spacing, y: startY + r*spacing, index: r*4 + c });
+            }
+        }
+
+        let activeTargetIndex = 0;
+        let previousTargetIndex = -1;
+        let targetSpawnTime = 0;
+        let lastClickTime = 0;
+        let mouseDownTime = 0;
+        let timeoutTimer = null;
+
+        let rawSessionData = {
+            reaction_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
+            itis: { Adjacent: [], Diagonal: [], Medium: [], Long: [] },
+            dwell_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
+            x_offsets: [], y_offsets: [], total_errors: 0
+        };
+
+        const menuView = document.getElementById('menu-view');
+        const gameView = document.getElementById('game-view');
+        const idInput = document.getElementById('participant-id');
+        const enrollBtn = document.getElementById('enroll-btn');
+        const verifyBtn = document.getElementById('verify-btn');
+        const feedbackMsg = document.getElementById('feedback-msg');
+        const targetDot = document.getElementById('target-dot');
+        const canvasContainer = document.getElementById('canvas-container');
+
+        window.addEventListener('keydown', (e) => {
+            if (appState !== "MENU") return;
+            if (document.activeElement === idInput) {
+                if (e.key === "Enter") handleAction(idInput.value.trim().toUpperCase(), "ENROLL");
+                return;
+            }
+            if (e.key.toLowerCase() === 'e') handleAction(idInput.value.trim().toUpperCase(), "ENROLL");
+            if (e.key.toLowerCase() === 'v') handleAction(idInput.value.trim().toUpperCase(), "VERIFY");
+        });
+
+        enrollBtn.addEventListener('click', () => handleAction(idInput.value.trim().toUpperCase(), "ENROLL"));
+        verifyBtn.addEventListener('click', () => handleAction(idInput.value.trim().toUpperCase(), "VERIFY"));
+
+        async function handleAction(id, mode) {
+            if (!id) { showFeedback("Error: ID string required.", "var(--error-color)"); return; }
+            
+            // Tell the user we are pinging the cloud
+            showFeedback("Checking database...", "var(--text-secondary)");
+
+            try {
+                // 1. Ping the new Python pre-flight endpoint
+                const response = await fetch(`/check/${id}`);
+                const data = await response.json();
+
+                // 2. Evaluate the Rules of Engagement
+                if (mode === "VERIFY" && !data.exists) {
+                    showFeedback("Error: User not found. Please enroll first.", "var(--error-color)");
+                    return; // Kills the function, game never starts
+                }
+
+                if (mode === "ENROLL" && data.exists) {
+                    showFeedback("Error: ID already exists in Cloud. Pick a new one.", "var(--error-color)");
+                    return; // Kills the function, game never starts
+                }
+
+                // 3. If the checks pass, clear the feedback and start the game!
+                showFeedback("", "transparent");
+                participantId = id;
+                currentMode = mode;
+                maxRounds = mode === "ENROLL" ? 5 : 1;
+                roundsCompleted = 0;
+                appState = mode;
+                
+                sessionRounds = [];
+                startNewRound();
+                
+            } catch (error) {
+                showFeedback(`Database connection failed. Is the server running?`, "var(--error-color)");
+                console.error("Fetch error:", error);
+            }
+        }
+
+        function startNewRound() {
+            targetsHit = 0;
+            // Clear ONLY the current round's recorder object
+            rawSessionData = {
+                reaction_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
+                itis: { Adjacent: [], Diagonal: [], Medium: [], Long: [] },
+                dwell_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
+                x_offsets: [], y_offsets: [], total_errors: 0
+            };
+
+            menuView.classList.add('hidden');
+            gameView.classList.remove('hidden');
+            document.getElementById('mode-text').innerText = currentMode;
+            updateOverlay();
+
+            spawnTarget(true);
+        }
+
+        function updateOverlay() {
+            document.getElementById('round-text').innerText = `${roundsCompleted + 1}/${maxRounds}`;
+            document.getElementById('target-text').innerText = `${targetsHit}/${maxTargets}`;
+        }
+
+        function spawnTarget(isFirst = false) {
+            if (timeoutTimer) clearTimeout(timeoutTimer);
+            targetDot.classList.add('hidden');
+
+            if (targetsHit >= maxTargets) {
+                processRoundCompletion();
+                return;
+            }
+
+            let newIndex = Math.floor(Math.random() * 16);
+            if (!isFirst) {
+                while (newIndex === activeTargetIndex) {
+                    newIndex = Math.floor(Math.random() * 16);
+                }
+            }
+            activeTargetIndex = newIndex;
+
+            const delay = isFirst ? 500 : Math.floor(Math.random() * 1000) + 500;
+            setTimeout(() => {
+                const pos = gridPositions[activeTargetIndex];
+                targetDot.style.left = `${pos.x}px`;
+                targetDot.style.top = `${pos.y}px`;
+                targetDot.classList.remove('hidden');
+
+                targetSpawnTime = performance.now();
+                if (targetsHit === 0) lastClickTime = targetSpawnTime;
+
+                timeoutTimer = setTimeout(handleTimeout, 2000);
+            }, delay);
+        }
+
+        targetDot.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; 
+            e.stopPropagation(); 
+            mouseDownTime = performance.now();
+        });
+
+        targetDot.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            e.stopPropagation();
+
+            const clickUpTime = performance.now();
+            const dwellTime = clickUpTime - mouseDownTime;
+            const reactionTime = mouseDownTime - targetSpawnTime;
+
+            const rect = targetDot.getBoundingClientRect();
+            const dotCenterX = rect.left + rect.width / 2;
+            const dotCenterY = rect.top + rect.height / 2;
+            const xOffset = e.clientX - dotCenterX;
+            const yOffset = e.clientY - dotCenterY;
+
+            const distance = Math.hypot(xOffset, yOffset);
+            if (distance > 40) {
+                handleMiss();
+                return;
+            }
+
+            if (targetsHit < 3) {
+                console.log(`Warmup Click ${targetsHit + 1} Ignored.`);
+            } else if (targetsHit === 3) {
+                rawSessionData.reaction_times.First.push(reactionTime);
+                rawSessionData.dwell_times.First.push(dwellTime);
+                rawSessionData.x_offsets.push(xOffset);
+                rawSessionData.y_offsets.push(yOffset);
+            } else {
+                const iti = mouseDownTime - lastClickTime;
+                const jumpType = calculateJumpType(previousTargetIndex, activeTargetIndex);
+                
+                rawSessionData.reaction_times[jumpType].push(reactionTime);
+                rawSessionData.itis[jumpType].push(iti);
+                rawSessionData.dwell_times[jumpType].push(dwellTime);
+                rawSessionData.x_offsets.push(xOffset);
+                rawSessionData.y_offsets.push(yOffset);
+            }
+
+            previousTargetIndex = activeTargetIndex;
+            lastClickTime = mouseDownTime;
+            targetsHit++;
+            updateOverlay();
+            spawnTarget();
+        });
+
+        canvasContainer.addEventListener('mousedown', () => {
+            if (appState === "MENU" || targetDot.classList.contains('hidden')) return;
+            handleMiss();
+        });
+
+        function handleMiss() {
+            rawSessionData.total_errors++;
+            console.log("MISS REGISTERED!");
+        }
+
+        function handleTimeout() {
+            rawSessionData.total_errors++;
+            console.log("TIMEOUT ACCRUED!");
+            canvasContainer.classList.add('flash-red');
+            setTimeout(() => canvasContainer.classList.remove('flash-red'), 150);
+            
+            spawnTarget();
+        }
+
+        function calculateJumpType(i1, i2) {
+            const r1 = Math.floor(i1 / 4), c1 = i1 % 4;
+            const r2 = Math.floor(i2 / 4), c2 = i2 % 4;
+            const gridDist = Math.hypot(r2 - r1, c2 - c1);
+
+            if (gridDist === 1.0) return "Adjacent";
+            if (gridDist > 1.0 && gridDist <= 1.5) return "Diagonal";
+            if (gridDist > 1.5 && gridDist <= 2.5) return "Medium";
+            return "Long";
+        }
+
+        function showFeedback(msg, color) {
+            feedbackMsg.innerText = msg;
+            feedbackMsg.style.color = color;
+        }
+
+        function processRoundCompletion() {
+            // CRITICAL FIX: Save the completed round data into the master array before starting a new round
+            sessionRounds.push(rawSessionData);
+            
+            roundsCompleted++;
+            if (roundsCompleted < maxRounds) {
+                canvasContainer.classList.add('flash-green');
+                setTimeout(() => {
+                    canvasContainer.classList.remove('flash-green');
+                    startNewRound();
+                }, 2000);
+            } else {
+                showFeedback("Processing biometric vectors...", "var(--target-color)");
+                gameView.classList.add('hidden');
+                menuView.classList.remove('hidden');
+                appState = "MENU";
+
+                sendPayloadToCloud();
+            }
+        }
+
+        async function sendPayloadToCloud() {
+
+            console.log("DEBUG: Inspecting the rounds array:", sessionRounds);
+            
+            const payload = {
+                participant_id: participantId,
+                mode: currentMode,
+                rounds: sessionRounds // Now contains all 5 historical rounds
+            };
+            
+            console.log("Transmitting to Backend:", payload);
+            showFeedback(`Transmitting biometric vectors...`, "var(--text-secondary)");
+
+            try {
+                const endpoint = currentMode === "ENROLL" ? "/enroll" : "/verify";
+                
+                const response = await fetch(`${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (currentMode === "VERIFY") {
+                        const color = data.match ? "var(--success-color)" : "var(--error-color)";
+                        const text = data.match ? `ACCEPTED! Score: ${data.score}` : `REJECTED! Score: ${data.score}`;
+                        showFeedback(text, color);
+                    } else {
+                        showFeedback(data.message, "var(--success-color)");
+                    }
+                } else {
+                    showFeedback(`Error: ${data.detail}`, "var(--error-color)");
+                }
+            } catch (error) {
+                showFeedback(`Connection failed. Is the server running?`, "var(--error-color)");
+                console.error("Fetch error:", error);
+            }
+        }
+    </script>
+</body>
+</html>

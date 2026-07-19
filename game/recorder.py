@@ -1,65 +1,53 @@
-import time
-
-
-class Recorder:
-    """
-    Records raw behavioral signals during a game round.
-    Tracks the 4 signals needed for the feature vector:
-      1. Inter-tap intervals
-      2. Reaction latency
-      3. Spatial accuracy (click offset from target center)
-      4. Error correction frequency
-    """
-
+class SessionRecorder:
     def __init__(self):
         self.reset()
-
+        
     def reset(self):
-        self.inter_tap_intervals = []   # time between consecutive taps
-        self.reaction_latencies = []    # time from target appearing to tap
-        self.spatial_accuracies = []    # distance from click to target center
-        self.error_corrections = []     # 1 if user missed and corrected, 0 otherwise
-
-        self._last_tap_time = None
-        self._target_appear_time = None
-        self._pending_error = False     # True if last click was a miss
-
-    def on_target_appear(self):
-        """Call this when a new target lights up."""
-        self._target_appear_time = time.time()
-
-    def on_correct_tap(self, offset):
-        """
-        Call this when the user clicks the correct target.
-        offset: Euclidean distance from click to target center (pixels)
-        """
-        now = time.time()
-
-        # inter-tap interval
-        if self._last_tap_time is not None:
-            self.inter_tap_intervals.append(now - self._last_tap_time)
-        self._last_tap_time = now
-
-        # reaction latency
-        if self._target_appear_time is not None:
-            self.reaction_latencies.append(now - self._target_appear_time)
-
-        # spatial accuracy
-        self.spatial_accuracies.append(offset)
-
-        # error correction — did they miss before getting it right?
-        self.error_corrections.append(1 if self._pending_error else 0)
-        self._pending_error = False
-
-    def on_incorrect_tap(self):
-        """Call this when the user clicks the wrong circle."""
-        self._pending_error = True
+        self.reaction_times = {"Adjacent": [], "Diagonal": [], "Medium": [], "Long": [], "First": []}
+        self.inter_tap_intervals = {"Adjacent": [], "Diagonal": [], "Medium": [], "Long": []}
+        self.dwell_times = {"Adjacent": [], "Diagonal": [], "Medium": [], "Long": [], "First": []}
+        
+        self.x_offsets = []
+        self.y_offsets = []
+        self.errors = 0
+        self.current_target_missed = False
+        
+        # --- NEW HIGH-FIDELITY TRACKING DATA ---
+        self.trajectories = []        # Stores lists of (t, x, y) streams per target movement
+        self.current_path = []        # Buffers active frame-by-frame positions
+        
+    def record_mouse_movement(self, timestamp, x, y):
+        """Call this on every Pygame frame loop to capture the trajectory path."""
+        self.current_path.append([int(timestamp), int(x), int(y)])
+        
+    def record_hit(self, jump_type, reaction_time, iti, dwell_time, x_offset, y_offset):
+        self.reaction_times[jump_type].append(reaction_time)
+        self.dwell_times[jump_type].append(dwell_time)
+        
+        if jump_type != "First":
+            self.inter_tap_intervals[jump_type].append(iti)
+            
+        self.x_offsets.append(x_offset)
+        self.y_offsets.append(y_offset)
+        self.current_target_missed = False
+        
+        # --- COMMIT THE ACTIVE PATH TRAJECTORY AND RESET BUFFER ---
+        self.trajectories.append(self.current_path)
+        self.current_path = [] # Fresh buffer for the next target segment
+        
+    def record_miss(self):
+        if not self.current_target_missed:
+            self.errors += 1
+            self.current_target_missed = True
 
     def get_raw_data(self):
-        """Returns the raw signal lists for feature extraction."""
         return {
-            "inter_tap_intervals": self.inter_tap_intervals,
-            "reaction_latencies": self.reaction_latencies,
-            "spatial_accuracies": self.spatial_accuracies,
-            "error_corrections": self.error_corrections,
+            "reaction_times": self.reaction_times,
+            "itis": self.inter_tap_intervals,
+            "dwell_times": self.dwell_times,
+            "x_offsets": self.x_offsets,
+            "y_offsets": self.y_offsets,
+            "total_errors": self.errors,
+            # --- EXPANDED DATA OUTPUT ---
+            "trajectories": self.trajectories
         }
