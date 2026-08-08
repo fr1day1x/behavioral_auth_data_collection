@@ -3,6 +3,15 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from pymongo import MongoClient
+
+from dotenv import load_dotenv
+load_dotenv() # This reads the .env file and loads MONGO_URI into the environment
+
+
+from pydantic import BaseModel
+from typing import List, Dict, Any
+
+
 import os
 
 app = FastAPI(title="Data Harvesting Engine Server")
@@ -10,9 +19,7 @@ app = FastAPI(title="Data Harvesting Engine Server")
 SHARED_RESEARCH_TOKEN = "your_shared_secret_research_key_here"
 
 # Securely grab the connection string from the hosting environment
-MONGO_URI = os.getenv("MONGO_URI")
-if not MONGO_URI:
-    raise RuntimeError("MONGO_URI environment variable is missing!")
+MONGO_URI = "mongodb+srv://kamaltalreja2007_db_user:1122334455667788@cluster0.pmgqtvt.mongodb.net/?appName=Cluster0"
 
 client = MongoClient(MONGO_URI)
 db = client["behavior_biometrics"]
@@ -22,6 +29,7 @@ class SessionPayload(BaseModel):
     participant_id: str
     mode: str
     rounds: List[Dict[str, Any]]
+    cognitive_data: dict = None  # ADD IT HERE INSTEAD
 
 # --- Frontend Serving Route ---
 @app.get("/", response_class=HTMLResponse)

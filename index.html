@@ -6,13 +6,13 @@
     <title>Data Harvesting Engine</title>
     <style>
         :root {
-            --bg-color: #0e1016; /* Matched to Pygame BG_COLOR */
-            --text-primary: #e6ebf5; /* Matched to Pygame TEXT_PRIMARY */
-            --text-secondary: #6e788c; /* Matched to Pygame TEXT_SECONDARY */
-            --target-color: #00c8ff; /* Matched to Pygame TARGET_COLOR */
-            --target-shadow: rgba(0, 70, 100, 0.4); /* Matched to Pygame TARGET_SHADOW */
+            --bg-color: #0e1016;
+            --text-primary: #e6ebf5;
+            --text-secondary: #6e788c;
+            --target-color: #00c8ff;
+            --target-shadow: rgba(0, 70, 100, 0.4);
             --error-color: #ff3c3c;
-            --success-color: #00ff78; /* Matched to Pygame SUCCESS_COLOR */
+            --success-color: #00ff78;
         }
 
         body {
@@ -90,7 +90,6 @@
             padding-left: 5%;
         }
 
-        /* The 4x4 Dot Arena Layout matching Pygame proportions */
         #canvas-container {
             position: relative;
             width: 600px;
@@ -114,11 +113,56 @@
 
         .flash-red { background-color: #401010 !important; }
         .flash-green { background-color: #104020 !important; }
+
+        /* --- NEW COGNITIVE KEYPAD STYLES --- */
+        #keypad-container {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            gap: 15px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #121620;
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid #1f2535;
+        }
+
+        .keypad-btn {
+            width: 80px;
+            height: 80px;
+            background-color: #1e2536;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: 2px solid #2a334a;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s;
+        }
+
+        .keypad-btn:active {
+            background-color: var(--target-color);
+            color: #000;
+        }
+
+        #pin-prompt {
+            position: absolute;
+            top: 10%;
+            width: 100%;
+            text-align: center;
+            font-size: 2rem;
+            color: var(--target-color);
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Menu Interface perfectly matching the desktop client screenshot -->
     <div id="menu-view">
         <h1>Data Harvesting Engine</h1>
         <div class="input-group">
@@ -129,26 +173,63 @@
         <div id="feedback-msg"></div>
     </div>
 
-    <!-- Active Gameplay View -->
     <div id="game-view" class="hidden">
         <div id="status-overlay">HARVESTING DATA - Profile: <span id="profile-text">-</span> | Round <span id="round-text">0/0</span> | Target <span id="target-text">0/0</span></div>
+        
         <div id="canvas-container">
             <div id="target-dot" class="hidden"></div>
+        </div>
+
+        <!-- --- NEW COGNITIVE KEYPAD ELEMENTS --- -->
+        <div id="pin-prompt" class="hidden">Enter sequence: <span id="target-pin"></span></div>
+        <div id="keypad-container" class="hidden">
+            <div class="keypad-btn" data-val="1">1</div>
+            <div class="keypad-btn" data-val="2">2</div>
+            <div class="keypad-btn" data-val="3">3</div>
+            <div class="keypad-btn" data-val="4">4</div>
+            <div class="keypad-btn" data-val="5">5</div>
+            <div class="keypad-btn" data-val="6">6</div>
+            <div class="keypad-btn" data-val="7">7</div>
+            <div class="keypad-btn" data-val="8">8</div>
+            <div class="keypad-btn" data-val="9">9</div>
+            <div></div> <!-- Spacer -->
+            <div class="keypad-btn" data-val="0">0</div>
+            <div></div> <!-- Spacer -->
         </div>
     </div>
 
     <script>
-        // --- DATA HARVESTING ENGINE PARAMETERS ---
+        // --- GLOBAL HARVESTING ENGINE PARAMETERS ---
+        let currentPath = [];
+        let lastSampleTime = 0;
+        const SAMPLE_INTERVAL_MS = 10;
+        let isTrackingTrajectory = false;
+        
+        let currentMouseX = 0;
+        let currentMouseY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            currentMouseX = e.clientX;
+            currentMouseY = e.clientY;
+
+            if (!isTrackingTrajectory) return;
+    
+            const now = performance.now();
+            if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+                currentPath.push({ x: e.clientX, y: e.clientY });
+                lastSampleTime = now;
+            }
+        });
+        
         let appState = "MENU";
         let participantId = "";
         let targetsHit = 0;
-        const maxTargets = 40; // Updated to match desktop telemetry specifications
+        const maxTargets = 15;
         let roundsCompleted = 0;
-        const maxRounds = 3;   // Updated to match desktop telemetry specifications
+        const maxRounds = 3;
         
         let sessionRounds = [];
         
-        // Dynamic grid coordination matrices
         const gridPositions = [];
         const startX = 150, startY = 150, spacing = 100;
         for(let r=0; r<4; r++) {
@@ -168,7 +249,18 @@
             reaction_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
             itis: { Adjacent: [], Diagonal: [], Medium: [], Long: [] },
             dwell_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
+            path_efficiencies: [],
             x_offsets: [], y_offsets: [], total_errors: 0
+        };
+
+        // --- NEW COGNITIVE STATE VARIABLES ---
+        let cognitivePhase = 0; // 0 = Inactive, 1 = Familiar, 2 = Unfamiliar
+        let currentPinTarget = "";
+        let currentPinInput = "";
+        let pinClickTimestamps = [];
+        let cognitiveData = {
+            familiar: { flight_times: [], path_efficiencies: [] },
+            unfamiliar: { flight_times: [], path_efficiencies: [] }
         };
 
         const menuView = document.getElementById('menu-view');
@@ -178,7 +270,6 @@
         const targetDot = document.getElementById('target-dot');
         const canvasContainer = document.getElementById('canvas-container');
 
-        // Capture enter key transaction to boot data acquisition
         window.addEventListener('keydown', (e) => {
             if (appState !== "MENU") return;
             if (e.key === "Enter") {
@@ -195,7 +286,6 @@
             showFeedback("Verifying network state...", "var(--text-secondary)");
 
             try {
-                // Pre-flight validation against database allocation indices
                 const response = await fetch(`/check/${id}`);
                 const data = await response.json();
 
@@ -204,6 +294,12 @@
                 roundsCompleted = 0;
                 appState = "COLLECT";
                 sessionRounds = [];
+                
+                // Reset Cognitive Data for new session
+                cognitiveData = {
+                    familiar: { flight_times: [], path_efficiencies: [] },
+                    unfamiliar: { flight_times: [], path_efficiencies: [] }
+                };
                 
                 document.getElementById('profile-text').innerText = participantId;
                 startNewRound();
@@ -220,11 +316,19 @@
                 reaction_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
                 itis: { Adjacent: [], Diagonal: [], Medium: [], Long: [] },
                 dwell_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
+                path_efficiencies: [],
                 x_offsets: [], y_offsets: [], total_errors: 0
             };
 
             menuView.classList.add('hidden');
             gameView.classList.remove('hidden');
+            
+            // Ensure dot-clicking UI is visible and keypad is hidden
+            document.getElementById('canvas-container').classList.remove('hidden');
+            document.getElementById('status-overlay').classList.remove('hidden');
+            document.getElementById('keypad-container').classList.add('hidden');
+            document.getElementById('pin-prompt').classList.add('hidden');
+
             updateOverlay();
             spawnTarget(true);
         }
@@ -251,7 +355,7 @@
             }
             activeTargetIndex = newIndex;
 
-            const delay = isFirst ? 500 : Math.floor(Math.random() * 800) + 400; // Aligned with desktop clock bounds
+            const delay = isFirst ? 500 : Math.floor(Math.random() * 800) + 400;
             setTimeout(() => {
                 const pos = gridPositions[activeTargetIndex];
                 targetDot.style.left = `${pos.x}px`;
@@ -260,6 +364,11 @@
 
                 targetSpawnTime = performance.now();
                 if (targetsHit === 0) lastClickTime = targetSpawnTime;
+
+                currentPath = [];
+                currentPath.push({ x: currentMouseX, y: currentMouseY });
+                lastSampleTime = targetSpawnTime;
+                isTrackingTrajectory = true;
 
                 timeoutTimer = setTimeout(handleTimeout, 2000);
             }, delay);
@@ -274,6 +383,9 @@
         targetDot.addEventListener('mouseup', (e) => {
             if (e.button !== 0) return;
             e.stopPropagation();
+
+            isTrackingTrajectory = false;
+            currentPath.push({ x: e.clientX, y: e.clientY });
 
             const clickUpTime = performance.now();
             const dwellTime = clickUpTime - mouseDownTime;
@@ -291,6 +403,8 @@
                 return;
             }
 
+            let pathEfficiency = calculateSegmentEfficiency(currentPath, e.clientX, e.clientY);
+
             if (targetsHit < 3) {
                 console.log(`Warmup Click ${targetsHit + 1} Ignored.`);
             } else if (targetsHit === 3) {
@@ -298,6 +412,7 @@
                 rawSessionData.dwell_times.First.push(dwellTime);
                 rawSessionData.x_offsets.push(xOffset);
                 rawSessionData.y_offsets.push(yOffset);
+                rawSessionData.path_efficiencies.push(pathEfficiency);
             } else {
                 const iti = mouseDownTime - lastClickTime;
                 const jumpType = calculateJumpType(previousTargetIndex, activeTargetIndex);
@@ -307,6 +422,7 @@
                 rawSessionData.dwell_times[jumpType].push(dwellTime);
                 rawSessionData.x_offsets.push(xOffset);
                 rawSessionData.y_offsets.push(yOffset);
+                rawSessionData.path_efficiencies.push(pathEfficiency);
             }
 
             previousTargetIndex = activeTargetIndex;
@@ -349,6 +465,7 @@
             feedbackMsg.style.color = color;
         }
 
+        // --- UPDATED: Bridging Logic ---
         function processRoundCompletion() {
             sessionRounds.push(rawSessionData);
             roundsCompleted++;
@@ -360,19 +477,111 @@
                     startNewRound();
                 }, 1500);
             } else {
-                showFeedback("Transmitting biometric harvesting arrays...", "var(--target-color)");
-                gameView.classList.add('hidden');
-                menuView.classList.remove('hidden');
-                appState = "MENU";
-                sendPayloadToCloud();
+                // Kick off the cognitive keypad phase instead of immediately transmitting
+                showFeedback("Initiating Cognitive Keypad Phase...", "var(--target-color)");
+                setTimeout(startCognitiveTest, 1000);
             }
         }
 
+        // --- NEW: Cognitive Phase Functions ---
+        function startCognitiveTest() {
+            document.getElementById('canvas-container').classList.add('hidden');
+            document.getElementById('status-overlay').classList.add('hidden');
+            
+            document.getElementById('keypad-container').classList.remove('hidden');
+            document.getElementById('pin-prompt').classList.remove('hidden');
+            
+            startFamiliarPhase();
+        }
+
+        function startFamiliarPhase() {
+            cognitivePhase = 1;
+            currentPinTarget = "1234"; // Control dataset
+            document.getElementById('target-pin').innerText = currentPinTarget;
+            resetPinTracking();
+        }
+
+        function startUnfamiliarPhase() {
+            cognitivePhase = 2;
+            currentPinTarget = Math.floor(1000 + Math.random() * 9000).toString(); // Novel dataset
+            document.getElementById('target-pin').innerText = currentPinTarget;
+            resetPinTracking();
+        }
+
+        function resetPinTracking() {
+            currentPinInput = "";
+            pinClickTimestamps = [];
+            currentPath = [{ x: currentMouseX, y: currentMouseY }];
+            lastSampleTime = performance.now();
+            isTrackingTrajectory = true; 
+        }
+
+        function calculateSegmentEfficiency(pathObj, endX, endY) {
+            if (pathObj.length < 2) return 1.0;
+            const start = pathObj[0];
+            const end = { x: endX, y: endY };
+            
+            const dStraight = Math.hypot(end.x - start.x, end.y - start.y);
+            let dActual = 0;
+            for (let i = 1; i < pathObj.length; i++) {
+                dActual += Math.hypot(
+                    pathObj[i].x - pathObj[i - 1].x,
+                    pathObj[i].y - pathObj[i - 1].y
+                );
+            }
+            dActual += Math.hypot(end.x - pathObj[pathObj.length - 1].x, end.y - pathObj[pathObj.length - 1].y);
+            
+            return dActual > 0 ? Number((dStraight / dActual).toFixed(4)) : 1.0;
+        }
+
+        document.querySelectorAll('.keypad-btn').forEach(btn => {
+            btn.addEventListener('mousedown', (e) => {
+                if (cognitivePhase === 0) return;
+                
+                const val = e.target.getAttribute('data-val');
+                currentPinInput += val;
+                
+                const clickTime = performance.now();
+                pinClickTimestamps.push(clickTime);
+                
+                // Calculate flight time & efficiency between clicks
+                if (pinClickTimestamps.length > 1) {
+                    const flightTime = clickTime - pinClickTimestamps[pinClickTimestamps.length - 2];
+                    const phaseKey = cognitivePhase === 1 ? 'familiar' : 'unfamiliar';
+                    
+                    cognitiveData[phaseKey].flight_times.push(Number(flightTime.toFixed(2)));
+                    
+                    const segmentEfficiency = calculateSegmentEfficiency(currentPath, e.clientX, e.clientY);
+                    cognitiveData[phaseKey].path_efficiencies.push(segmentEfficiency);
+                }
+                
+                // Reset trajectory anchor to the button just clicked
+                currentPath = [{ x: e.clientX, y: e.clientY }];
+                
+                if (currentPinInput.length === 4) {
+                    if (cognitivePhase === 1) {
+                        setTimeout(startUnfamiliarPhase, 500);
+                    } else {
+                        isTrackingTrajectory = false;
+                        cognitivePhase = 0; // Lock keypad
+                        sendPayloadToCloud();
+                    }
+                }
+            });
+        });
+
+        // --- UPDATED: Payload Transmitter ---
         async function sendPayloadToCloud() {
+            showFeedback("Transmitting biometric & cognitive arrays...", "var(--target-color)");
+            gameView.classList.add('hidden');
+            menuView.classList.remove('hidden');
+            appState = "MENU";
+
             const payload = {
                 participant_id: participantId,
                 mode: "ENROLL",
-                rounds: sessionRounds
+                rounds: sessionRounds,
+                cognitive_data: cognitiveData // Injected into the final JSON bundle
             };
 
             try {
