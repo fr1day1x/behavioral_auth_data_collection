@@ -130,3 +130,54 @@ print("\n--- Feature Importances ---")
 importances = rf_clf.feature_importances_
 for feature, importance in sorted(zip(feature_cols, importances), key=lambda x: x[1], reverse=True):
     print(f"{feature.ljust(18)}: {importance * 100:.2f}% influence")
+
+    import matplotlib.pyplot as plt
+
+# ==================================================
+#  PHASE 4: VISUALIZATION EXPORT
+# ==================================================
+
+# --- Graph 1: Feature Importances ---
+print("\nGenerating Feature Importance Chart...")
+plt.style.use('dark_background') # Matches your frontend aesthetic
+plt.figure(figsize=(10, 6))
+
+# Sort features for plotting
+features, imps = zip(*sorted(zip(feature_cols, importances), key=lambda x: x[1], reverse=False))
+
+# Create horizontal bar chart
+bars = plt.barh(features, [i * 100 for i in imps], color='#00c8ff')
+plt.title('Random Forest Feature Importances:\nCognitive vs. Motor-Kinematics', fontsize=16, fontweight='bold', pad=15)
+plt.xlabel('Influence Weight (%)', fontsize=12)
+
+# Auto-label the bars with their exact percentages
+for bar in bars:
+    width = bar.get_width()
+    if width > 0:
+        plt.text(width + 0.5, bar.get_y() + bar.get_height()/2, f'{width:.1f}%', 
+                 ha='left', va='center', fontweight='bold')
+
+plt.tight_layout()
+plt.savefig('feature_importances.png', dpi=300)
+plt.show()
+
+# --- Graph 2: Cognitive Hesitation by Participant ---
+print("Generating Cognitive Hesitation Variance Chart...")
+plt.figure(figsize=(10, 6))
+
+# Calculate the average hesitation variance per user
+user_variance = df.groupby('participant_id')['cog_variance'].mean().sort_values(ascending=False)
+
+# Plotting the millisecond gap
+user_bars = user_variance.plot(kind='bar', color='#ff3c3c', width=0.6)
+plt.title('Average Cognitive Hesitation by Test Subject', fontsize=16, fontweight='bold', pad=15)
+plt.ylabel('Hesitation Variance (Milliseconds)', fontsize=12)
+plt.xlabel('Participant ID', fontsize=12)
+plt.xticks(rotation=45, ha='right')
+plt.grid(axis='y', linestyle='--', alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('cognitive_variance.png', dpi=300)
+plt.show()
+
+print("\n[SUCCESS] Visualizations saved as high-res PNG files in your project directory.")

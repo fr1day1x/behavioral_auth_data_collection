@@ -3,217 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Harvesting Engine</title>
+    <title>Cyber-Breach Aim Trainer</title>
     <style>
         :root {
-            --bg-color: #0e1016;
-            --text-primary: #e6ebf5;
-            --text-secondary: #6e788c;
-            --target-color: #00c8ff;
-            --target-shadow: rgba(0, 70, 100, 0.4);
-            --error-color: #ff3c3c;
-            --success-color: #00ff78;
+            --bg-color: #0b0c10;
+            --text-primary: #c5c6c7;
+            --target-color: #66fcf1;
+            --target-shadow: rgba(102, 252, 241, 0.6);
+            --error-color: #ff004c;
+            --success-color: #45a29e;
+            --panel-bg: #1f2833;
         }
 
         body {
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             background-color: var(--bg-color);
             color: var(--text-primary);
-            font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
-            user-select: none;
+            font-family: 'Courier New', Courier, monospace; /* Arcade Hacker aesthetic */
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden; user-select: none;
         }
 
         #menu-view, #game-view {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            max-width: 800px;
+            display: flex; flex-direction: column;
+            align-items: center; width: 100%; max-width: 800px;
         }
 
         .hidden { display: none !important; }
 
         h1 {
-            font-size: 3rem;
-            margin-bottom: 2rem;
-            letter-spacing: -1px;
-            font-weight: bold;
+            font-size: 3rem; color: var(--target-color);
+            text-shadow: 0 0 10px var(--target-shadow);
+            margin-bottom: 1rem; text-transform: uppercase;
         }
 
-        .input-group {
-            margin-bottom: 1.5rem;
-            text-align: center;
-            font-size: 1.5rem;
-        }
+        .subtitle { color: var(--text-primary); margin-bottom: 3rem; font-size: 1.2rem; }
 
-        .input-label {
-            color: var(--text-primary);
-            margin-right: 0.5rem;
-        }
-
+        .input-group { text-align: center; margin-bottom: 1.5rem; }
+        .input-label { display: block; margin-bottom: 10px; font-size: 1.2rem; }
+        
         input {
-            background: transparent;
-            border: none;
-            color: var(--target-color);
-            font-size: 1.5rem;
-            font-weight: bold;
-            outline: none;
-            text-transform: uppercase;
-            width: 250px;
+            background: var(--panel-bg); border: 2px solid var(--target-color);
+            color: var(--target-color); font-size: 1.5rem; font-family: inherit;
+            padding: 10px; text-align: center; text-transform: uppercase;
+            outline: none; box-shadow: 0 0 15px rgba(102, 252, 241, 0.2);
         }
 
-        .hint-text {
-            color: var(--text-secondary);
-            font-size: 1.2rem;
-            margin-top: 1rem;
-        }
+        .hint-text { margin-top: 15px; font-size: 1rem; opacity: 0.7; }
+        #feedback-msg { margin-top: 2rem; font-size: 1.2rem; height: 1.5rem; font-weight: bold; }
 
-        #feedback-msg {
-            margin-top: 2rem;
-            font-size: 1.2rem;
-            height: 1.5rem;
+        /* --- GAME HUD --- */
+        #hud {
+            display: flex; justify-content: space-between;
+            width: 600px; margin-bottom: 10px; font-size: 1.2rem; font-weight: bold;
         }
-
-        #status-overlay {
-            font-size: 1.1rem;
-            color: var(--text-secondary);
-            margin-bottom: 1.5rem;
-            align-self: flex-start;
-            padding-left: 5%;
-        }
+        .score-box { color: var(--target-color); }
+        .acc-box { color: var(--success-color); }
 
         #canvas-container {
-            position: relative;
-            width: 600px;
-            height: 600px;
-            background: #121620;
-            border-radius: 12px;
-            border: 1px solid #1f2535;
+            position: relative; width: 600px; height: 600px;
+            background: #111; border: 2px solid var(--panel-bg);
+            border-radius: 8px; overflow: hidden;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
         }
 
         #target-dot {
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            background-color: var(--target-color);
-            border-radius: 50%;
-            cursor: pointer;
-            transform: translate(-50%, -50%);
+            position: absolute; width: 60px; height: 60px;
+            background-color: var(--target-color); border-radius: 50%;
+            cursor: crosshair; transform: translate(-50%, -50%);
             box-shadow: 0 0 20px var(--target-shadow);
-            transition: top 0.1s ease, left 0.1s ease;
         }
 
-        .flash-red { background-color: #401010 !important; }
-        .flash-green { background-color: #104020 !important; }
+        /* The shrinking timer ring */
+        #target-ring {
+            position: absolute; border: 2px solid var(--target-color);
+            border-radius: 50%; top: -10px; left: -10px; right: -10px; bottom: -10px;
+            animation: shrink 1.5s linear forwards; pointer-events: none;
+        }
 
-        /* --- NEW COGNITIVE KEYPAD STYLES --- */
+        @keyframes shrink {
+            0% { transform: scale(1.5); opacity: 0; }
+            10% { opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .flash-red { animation: damage 0.2s; }
+        .flash-green { animation: stageClear 1s; }
+
+        @keyframes damage {
+            0% { background-color: var(--error-color); }
+            100% { background-color: #111; }
+        }
+        @keyframes stageClear {
+            0% { background-color: var(--success-color); }
+            100% { background-color: #111; }
+        }
+
+        /* --- COGNITIVE KEYPAD (BOSS STAGE) --- */
         #keypad-container {
-            display: grid;
-            grid-template-columns: repeat(3, 80px);
-            gap: 15px;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #121620;
-            padding: 30px;
-            border-radius: 12px;
-            border: 1px solid #1f2535;
+            display: grid; grid-template-columns: repeat(3, 80px); gap: 15px;
+            position: absolute; top: 58%; left: 50%; transform: translate(-50%, -50%);
+            background: var(--panel-bg); padding: 30px; border-radius: 8px;
+            border: 2px solid var(--target-color);
+            box-shadow: 0 0 30px var(--target-shadow);
+            z-index: 5;
         }
 
         .keypad-btn {
-            width: 80px;
-            height: 80px;
-            background-color: #1e2536;
-            color: var(--text-primary);
-            font-size: 1.5rem;
-            font-weight: bold;
-            border: 2px solid #2a334a;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.1s;
+            width: 80px; height: 80px; background-color: #111;
+            color: var(--target-color); font-size: 2rem; font-weight: bold;
+            border: 2px solid var(--target-color); border-radius: 8px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
-
-        .keypad-btn:active {
-            background-color: var(--target-color);
-            color: #000;
-        }
+        .keypad-btn:active { background-color: var(--target-color); color: #000; }
 
         #pin-prompt {
-            position: absolute;
-            top: 10%;
-            width: 100%;
-            text-align: center;
-            font-size: 2rem;
-            color: var(--target-color);
-            font-weight: bold;
+            position: absolute; top: 5%; width: 100%; text-align: center;
+            font-size: 1.5rem; color: var(--error-color); text-transform: uppercase;
+            z-index: 10;
         }
+        #target-pin { font-size: 2.5rem; display: block; margin-top: 10px; color: var(--target-color); letter-spacing: 5px; }
     </style>
 </head>
 <body>
 
+    <!-- MENU SCREEN -->
     <div id="menu-view">
-        <h1>Data Harvesting Engine</h1>
+        <h1>Cyber-Breach</h1>
+        <div class="subtitle">Reaction & Synchronization Protocol</div>
         <div class="input-group">
-            <span class="input-label">Enter Subject ID:</span>
+            <span class="input-label">Enter Operative ID:</span>
             <input type="text" id="participant-id" maxlength="10" autocomplete="off" autofocus>
         </div>
-        <div class="hint-text">Press [ENTER] to execute data acquisition</div>
+        <div class="hint-text">Press [ENTER] to initiate sequence</div>
         <div id="feedback-msg"></div>
     </div>
 
+    <!-- GAME SCREEN -->
     <div id="game-view" class="hidden">
-        <div id="status-overlay">HARVESTING DATA - Profile: <span id="profile-text">-</span> | Round <span id="round-text">0/0</span> | Target <span id="target-text">0/0</span></div>
+        
+        <div id="hud">
+            <div>Stage: <span id="round-text">1/3</span></div>
+            <div class="score-box">Score: <span id="score-val">0</span></div>
+            <div class="acc-box">Accuracy: <span id="acc-val">100</span>%</div>
+        </div>
         
         <div id="canvas-container">
-            <div id="target-dot" class="hidden"></div>
-        </div>
-
-        <!-- --- NEW COGNITIVE KEYPAD ELEMENTS --- -->
-        <div id="pin-prompt" class="hidden">Enter sequence: <span id="target-pin"></span></div>
-        <div id="keypad-container" class="hidden">
-            <div class="keypad-btn" data-val="1">1</div>
-            <div class="keypad-btn" data-val="2">2</div>
-            <div class="keypad-btn" data-val="3">3</div>
-            <div class="keypad-btn" data-val="4">4</div>
-            <div class="keypad-btn" data-val="5">5</div>
-            <div class="keypad-btn" data-val="6">6</div>
-            <div class="keypad-btn" data-val="7">7</div>
-            <div class="keypad-btn" data-val="8">8</div>
-            <div class="keypad-btn" data-val="9">9</div>
-            <div></div> <!-- Spacer -->
-            <div class="keypad-btn" data-val="0">0</div>
-            <div></div> <!-- Spacer -->
+            <div id="target-dot" class="hidden"><div id="target-ring"></div></div>
+            
+            <!-- COGNITIVE OVERRIDE MINIGAME -->
+            <div id="pin-prompt" class="hidden">System Override Required<span id="target-pin"></span></div>
+            <div id="keypad-container" class="hidden">
+                <div class="keypad-btn" data-val="1">1</div>
+                <div class="keypad-btn" data-val="2">2</div>
+                <div class="keypad-btn" data-val="3">3</div>
+                <div class="keypad-btn" data-val="4">4</div>
+                <div class="keypad-btn" data-val="5">5</div>
+                <div class="keypad-btn" data-val="6">6</div>
+                <div class="keypad-btn" data-val="7">7</div>
+                <div class="keypad-btn" data-val="8">8</div>
+                <div class="keypad-btn" data-val="9">9</div>
+                <div></div>
+                <div class="keypad-btn" data-val="0">0</div>
+                <div></div>
+            </div>
         </div>
     </div>
 
     <script>
-        // --- GLOBAL HARVESTING ENGINE PARAMETERS ---
+        // --- TELEMETRY ENGINE (Unchanged Data Structures) ---
         let currentPath = [];
         let lastSampleTime = 0;
         const SAMPLE_INTERVAL_MS = 10;
         let isTrackingTrajectory = false;
-        
-        let currentMouseX = 0;
-        let currentMouseY = 0;
+        let currentMouseX = 0, currentMouseY = 0;
 
         document.addEventListener('mousemove', (e) => {
-            currentMouseX = e.clientX;
-            currentMouseY = e.clientY;
-
+            currentMouseX = e.clientX; currentMouseY = e.clientY;
             if (!isTrackingTrajectory) return;
-    
             const now = performance.now();
             if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
                 currentPath.push({ x: e.clientX, y: e.clientY });
@@ -221,14 +189,12 @@
             }
         });
         
-        let appState = "MENU";
-        let participantId = "";
-        let targetsHit = 0;
-        const maxTargets = 15;
-        let roundsCompleted = 0;
-        const maxRounds = 3;
-        
+        let appState = "MENU", participantId = "";
+        let targetsHit = 0, totalClicks = 0;
+        const maxTargets = 20; // 20 per round makes for a good arcade feel
+        let roundsCompleted = 0, maxRounds = 3;
         let sessionRounds = [];
+        let gameScore = 0;
         
         const gridPositions = [];
         const startX = 150, startY = 150, spacing = 100;
@@ -238,11 +204,8 @@
             }
         }
 
-        let activeTargetIndex = 0;
-        let previousTargetIndex = -1;
-        let targetSpawnTime = 0;
-        let lastClickTime = 0;
-        let mouseDownTime = 0;
+        let activeTargetIndex = 0, previousTargetIndex = -1;
+        let targetSpawnTime = 0, lastClickTime = 0, mouseDownTime = 0;
         let timeoutTimer = null;
 
         let rawSessionData = {
@@ -253,60 +216,37 @@
             x_offsets: [], y_offsets: [], total_errors: 0
         };
 
-        // --- NEW COGNITIVE STATE VARIABLES ---
-        let cognitivePhase = 0; // 0 = Inactive, 1 = Familiar, 2 = Unfamiliar
-        let currentPinTarget = "";
-        let currentPinInput = "";
+        // --- COGNITIVE DATA ---
+        let cognitivePhase = 0; 
+        let currentPinTarget = "", currentPinInput = "";
         let pinClickTimestamps = [];
         let cognitiveData = {
             familiar: { flight_times: [], path_efficiencies: [] },
             unfamiliar: { flight_times: [], path_efficiencies: [] }
         };
 
-        const menuView = document.getElementById('menu-view');
-        const gameView = document.getElementById('game-view');
-        const idInput = document.getElementById('participant-id');
-        const feedbackMsg = document.getElementById('feedback-msg');
-        const targetDot = document.getElementById('target-dot');
-        const canvasContainer = document.getElementById('canvas-container');
+        const menuView = document.getElementById('menu-view'), gameView = document.getElementById('game-view');
+        const targetDot = document.getElementById('target-dot'), canvasContainer = document.getElementById('canvas-container');
+        const scoreVal = document.getElementById('score-val'), accVal = document.getElementById('acc-val');
 
         window.addEventListener('keydown', (e) => {
             if (appState !== "MENU") return;
             if (e.key === "Enter") {
-                const idValue = idInput.value.trim().toUpperCase();
-                if (idValue.length > 0) {
-                    executeDataAcquisition(idValue);
-                } else {
-                    showFeedback("Error: Subject ID string required.", "var(--error-color)");
-                }
+                const idValue = document.getElementById('participant-id').value.trim().toUpperCase();
+                if (idValue.length > 0) executeDataAcquisition(idValue);
+                else document.getElementById('feedback-msg').innerText = "Operative ID Required.";
             }
         });
 
         async function executeDataAcquisition(id) {
-            showFeedback("Verifying network state...", "var(--text-secondary)");
-
+            document.getElementById('feedback-msg').innerText = "Connecting to mainframe...";
             try {
-                const response = await fetch(`/check/${id}`);
-                const data = await response.json();
-
-                showFeedback("", "transparent");
-                participantId = id;
-                roundsCompleted = 0;
-                appState = "COLLECT";
-                sessionRounds = [];
-                
-                // Reset Cognitive Data for new session
-                cognitiveData = {
-                    familiar: { flight_times: [], path_efficiencies: [] },
-                    unfamiliar: { flight_times: [], path_efficiencies: [] }
-                };
-                
-                document.getElementById('profile-text').innerText = participantId;
+                // await fetch(`/check/${id}`); // Removed for pure client-side testing, add back if checking IDs
+                participantId = id; roundsCompleted = 0; gameScore = 0; totalClicks = 0;
+                appState = "COLLECT"; sessionRounds = [];
                 startNewRound();
-                
             } catch (error) {
-                showFeedback(`Database connection failed. Is the server running?`, "var(--error-color)");
-                console.error("Fetch error:", error);
+                document.getElementById('feedback-msg').innerText = "Connection Failed.";
             }
         }
 
@@ -316,61 +256,53 @@
                 reaction_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
                 itis: { Adjacent: [], Diagonal: [], Medium: [], Long: [] },
                 dwell_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
-                path_efficiencies: [],
-                x_offsets: [], y_offsets: [], total_errors: 0
+                path_efficiencies: [], x_offsets: [], y_offsets: [], total_errors: 0
             };
 
-            menuView.classList.add('hidden');
-            gameView.classList.remove('hidden');
-            
-            // Ensure dot-clicking UI is visible and keypad is hidden
-            document.getElementById('canvas-container').classList.remove('hidden');
-            document.getElementById('status-overlay').classList.remove('hidden');
+            menuView.classList.add('hidden'); gameView.classList.remove('hidden');
+            canvasContainer.classList.remove('hidden');
+            document.getElementById('hud').classList.remove('hidden');
             document.getElementById('keypad-container').classList.add('hidden');
             document.getElementById('pin-prompt').classList.add('hidden');
 
-            updateOverlay();
-            spawnTarget(true);
+            updateOverlay(); spawnTarget(true);
         }
 
         function updateOverlay() {
             document.getElementById('round-text').innerText = `${roundsCompleted + 1}/${maxRounds}`;
-            document.getElementById('target-text').innerText = `${targetsHit}/${maxTargets}`;
+            scoreVal.innerText = gameScore;
+            let accuracy = totalClicks === 0 ? 100 : Math.round(((totalClicks - rawSessionData.total_errors) / totalClicks) * 100);
+            accVal.innerText = accuracy;
+            accVal.style.color = accuracy < 80 ? 'var(--error-color)' : 'var(--success-color)';
         }
 
         function spawnTarget(isFirst = false) {
             if (timeoutTimer) clearTimeout(timeoutTimer);
             targetDot.classList.add('hidden');
 
-            if (targetsHit >= maxTargets) {
-                processRoundCompletion();
-                return;
-            }
+            if (targetsHit >= maxTargets) { processRoundCompletion(); return; }
 
             let newIndex = Math.floor(Math.random() * 16);
-            if (!isFirst) {
-                while (newIndex === activeTargetIndex) {
-                    newIndex = Math.floor(Math.random() * 16);
-                }
-            }
+            if (!isFirst) while (newIndex === activeTargetIndex) newIndex = Math.floor(Math.random() * 16);
             activeTargetIndex = newIndex;
 
-            const delay = isFirst ? 500 : Math.floor(Math.random() * 800) + 400;
+            const delay = isFirst ? 500 : Math.floor(Math.random() * 400) + 200; // Faster arcade pacing
             setTimeout(() => {
                 const pos = gridPositions[activeTargetIndex];
-                targetDot.style.left = `${pos.x}px`;
-                targetDot.style.top = `${pos.y}px`;
-                targetDot.classList.remove('hidden');
+                targetDot.style.left = `${pos.x}px`; targetDot.style.top = `${pos.y}px`;
+                
+                // Restart animation ring
+                const ring = document.getElementById('target-ring');
+                ring.style.animation = 'none'; ring.offsetHeight; ring.style.animation = null;
 
+                targetDot.classList.remove('hidden');
                 targetSpawnTime = performance.now();
                 if (targetsHit === 0) lastClickTime = targetSpawnTime;
 
-                currentPath = [];
-                currentPath.push({ x: currentMouseX, y: currentMouseY });
-                lastSampleTime = targetSpawnTime;
-                isTrackingTrajectory = true;
+                currentPath = [{ x: currentMouseX, y: currentMouseY }];
+                lastSampleTime = targetSpawnTime; isTrackingTrajectory = true;
 
-                timeoutTimer = setTimeout(handleTimeout, 2000);
+                timeoutTimer = setTimeout(handleTimeout, 1500); // 1.5 seconds to hit it
             }, delay);
         }
 
@@ -378,159 +310,121 @@
             if (e.button !== 0) return; 
             e.stopPropagation(); 
             mouseDownTime = performance.now();
+            totalClicks++;
         });
 
         targetDot.addEventListener('mouseup', (e) => {
-            if (e.button !== 0) return;
-            e.stopPropagation();
-
-            isTrackingTrajectory = false;
-            currentPath.push({ x: e.clientX, y: e.clientY });
+            if (e.button !== 0) return; e.stopPropagation();
+            isTrackingTrajectory = false; currentPath.push({ x: e.clientX, y: e.clientY });
 
             const clickUpTime = performance.now();
             const dwellTime = clickUpTime - mouseDownTime;
             const reactionTime = mouseDownTime - targetSpawnTime;
+            
+            gameScore += Math.max(10, 500 - Math.floor(reactionTime)); // Faster = more points
 
             const rect = targetDot.getBoundingClientRect();
-            const dotCenterX = rect.left + rect.width / 2;
-            const dotCenterY = rect.top + rect.height / 2;
-            const xOffset = e.clientX - dotCenterX;
-            const yOffset = e.clientY - dotCenterY;
-
-            const distance = Math.hypot(xOffset, yOffset);
-            if (distance > 40) {
-                handleMiss();
-                return;
-            }
+            const xOffset = e.clientX - (rect.left + rect.width / 2);
+            const yOffset = e.clientY - (rect.top + rect.height / 2);
 
             let pathEfficiency = calculateSegmentEfficiency(currentPath, e.clientX, e.clientY);
 
             if (targetsHit < 3) {
-                console.log(`Warmup Click ${targetsHit + 1} Ignored.`);
+                // Warmup
             } else if (targetsHit === 3) {
                 rawSessionData.reaction_times.First.push(reactionTime);
                 rawSessionData.dwell_times.First.push(dwellTime);
-                rawSessionData.x_offsets.push(xOffset);
-                rawSessionData.y_offsets.push(yOffset);
+                rawSessionData.x_offsets.push(xOffset); rawSessionData.y_offsets.push(yOffset);
                 rawSessionData.path_efficiencies.push(pathEfficiency);
             } else {
                 const iti = mouseDownTime - lastClickTime;
                 const jumpType = calculateJumpType(previousTargetIndex, activeTargetIndex);
-                
                 rawSessionData.reaction_times[jumpType].push(reactionTime);
                 rawSessionData.itis[jumpType].push(iti);
                 rawSessionData.dwell_times[jumpType].push(dwellTime);
-                rawSessionData.x_offsets.push(xOffset);
-                rawSessionData.y_offsets.push(yOffset);
+                rawSessionData.x_offsets.push(xOffset); rawSessionData.y_offsets.push(yOffset);
                 rawSessionData.path_efficiencies.push(pathEfficiency);
             }
 
-            previousTargetIndex = activeTargetIndex;
-            lastClickTime = mouseDownTime;
-            targetsHit++;
-            updateOverlay();
-            spawnTarget();
+            previousTargetIndex = activeTargetIndex; lastClickTime = mouseDownTime;
+            targetsHit++; updateOverlay(); spawnTarget();
         });
 
         canvasContainer.addEventListener('mousedown', () => {
-            if (appState === "MENU" || targetDot.classList.contains('hidden')) return;
-            handleMiss();
+            if (appState === "MENU" || targetDot.classList.contains('hidden') || cognitivePhase !== 0) return;
+            totalClicks++; handleMiss();
         });
 
         function handleMiss() {
             rawSessionData.total_errors++;
-            console.log("MISS REGISTERED!");
+            gameScore = Math.max(0, gameScore - 50); // Penalty
+            canvasContainer.classList.add('flash-red');
+            setTimeout(() => canvasContainer.classList.remove('flash-red'), 150);
+            updateOverlay();
         }
 
         function handleTimeout() {
-            rawSessionData.total_errors++;
-            canvasContainer.classList.add('flash-red');
-            setTimeout(() => canvasContainer.classList.remove('flash-red'), 150);
-            spawnTarget();
+            totalClicks++; handleMiss(); spawnTarget();
         }
 
         function calculateJumpType(i1, i2) {
             const r1 = Math.floor(i1 / 4), c1 = i1 % 4;
             const r2 = Math.floor(i2 / 4), c2 = i2 % 4;
             const gridDist = Math.hypot(r2 - r1, c2 - c1);
-
             if (gridDist === 1.0) return "Adjacent";
             if (gridDist > 1.0 && gridDist <= 1.5) return "Diagonal";
             if (gridDist > 1.5 && gridDist <= 2.5) return "Medium";
             return "Long";
         }
 
-        function showFeedback(msg, color) {
-            feedbackMsg.innerText = msg;
-            feedbackMsg.style.color = color;
-        }
-
-        // --- UPDATED: Bridging Logic ---
         function processRoundCompletion() {
-            sessionRounds.push(rawSessionData);
-            roundsCompleted++;
-            
+            sessionRounds.push(rawSessionData); roundsCompleted++;
             if (roundsCompleted < maxRounds) {
                 canvasContainer.classList.add('flash-green');
                 setTimeout(() => {
-                    canvasContainer.classList.remove('flash-green');
-                    startNewRound();
+                    canvasContainer.classList.remove('flash-green'); startNewRound();
                 }, 1500);
             } else {
-                // Kick off the cognitive keypad phase instead of immediately transmitting
-                showFeedback("Initiating Cognitive Keypad Phase...", "var(--target-color)");
+                document.getElementById('hud').classList.add('hidden');
                 setTimeout(startCognitiveTest, 1000);
             }
         }
 
-        // --- NEW: Cognitive Phase Functions ---
+        // --- BOSS STAGE: COGNITIVE MINIGAME ---
         function startCognitiveTest() {
-            document.getElementById('canvas-container').classList.add('hidden');
-            document.getElementById('status-overlay').classList.add('hidden');
-            
+            targetDot.classList.add('hidden');
             document.getElementById('keypad-container').classList.remove('hidden');
             document.getElementById('pin-prompt').classList.remove('hidden');
-            
             startFamiliarPhase();
         }
 
         function startFamiliarPhase() {
-            cognitivePhase = 1;
-            currentPinTarget = "1234"; // Control dataset
-            document.getElementById('target-pin').innerText = currentPinTarget;
+            cognitivePhase = 1; currentPinTarget = "1234"; 
+            document.getElementById('pin-prompt').innerHTML = `DEFAULT PROTOCOL<span id="target-pin">${currentPinTarget}</span>`;
             resetPinTracking();
         }
 
         function startUnfamiliarPhase() {
-            cognitivePhase = 2;
-            currentPinTarget = Math.floor(1000 + Math.random() * 9000).toString(); // Novel dataset
-            document.getElementById('target-pin').innerText = currentPinTarget;
+            cognitivePhase = 2; currentPinTarget = Math.floor(1000 + Math.random() * 9000).toString();
+            document.getElementById('pin-prompt').innerHTML = `DECRYPTION KEY<span id="target-pin">${currentPinTarget}</span>`;
             resetPinTracking();
         }
 
         function resetPinTracking() {
-            currentPinInput = "";
-            pinClickTimestamps = [];
+            currentPinInput = ""; pinClickTimestamps = [];
             currentPath = [{ x: currentMouseX, y: currentMouseY }];
-            lastSampleTime = performance.now();
-            isTrackingTrajectory = true; 
+            lastSampleTime = performance.now(); isTrackingTrajectory = true; 
         }
 
         function calculateSegmentEfficiency(pathObj, endX, endY) {
             if (pathObj.length < 2) return 1.0;
-            const start = pathObj[0];
-            const end = { x: endX, y: endY };
-            
+            const start = pathObj[0]; const end = { x: endX, y: endY };
             const dStraight = Math.hypot(end.x - start.x, end.y - start.y);
             let dActual = 0;
             for (let i = 1; i < pathObj.length; i++) {
-                dActual += Math.hypot(
-                    pathObj[i].x - pathObj[i - 1].x,
-                    pathObj[i].y - pathObj[i - 1].y
-                );
+                dActual += Math.hypot(pathObj[i].x - pathObj[i - 1].x, pathObj[i].y - pathObj[i - 1].y);
             }
             dActual += Math.hypot(end.x - pathObj[pathObj.length - 1].x, end.y - pathObj[pathObj.length - 1].y);
-            
             return dActual > 0 ? Number((dStraight / dActual).toFixed(4)) : 1.0;
         }
 
@@ -540,67 +434,49 @@
                 
                 const val = e.target.getAttribute('data-val');
                 currentPinInput += val;
-                
                 const clickTime = performance.now();
                 pinClickTimestamps.push(clickTime);
                 
-                // Calculate flight time & efficiency between clicks
                 if (pinClickTimestamps.length > 1) {
                     const flightTime = clickTime - pinClickTimestamps[pinClickTimestamps.length - 2];
                     const phaseKey = cognitivePhase === 1 ? 'familiar' : 'unfamiliar';
-                    
                     cognitiveData[phaseKey].flight_times.push(Number(flightTime.toFixed(2)));
-                    
                     const segmentEfficiency = calculateSegmentEfficiency(currentPath, e.clientX, e.clientY);
                     cognitiveData[phaseKey].path_efficiencies.push(segmentEfficiency);
                 }
                 
-                // Reset trajectory anchor to the button just clicked
                 currentPath = [{ x: e.clientX, y: e.clientY }];
                 
                 if (currentPinInput.length === 4) {
                     if (cognitivePhase === 1) {
                         setTimeout(startUnfamiliarPhase, 500);
                     } else {
-                        isTrackingTrajectory = false;
-                        cognitivePhase = 0; // Lock keypad
+                        isTrackingTrajectory = false; cognitivePhase = 0; 
                         sendPayloadToCloud();
                     }
                 }
             });
         });
 
-        // --- UPDATED: Payload Transmitter ---
         async function sendPayloadToCloud() {
-            showFeedback("Transmitting biometric & cognitive arrays...", "var(--target-color)");
-            gameView.classList.add('hidden');
-            menuView.classList.remove('hidden');
+            gameView.classList.add('hidden'); menuView.classList.remove('hidden');
+            document.getElementById('feedback-msg').innerText = "Transmitting Telemetry...";
             appState = "MENU";
 
             const payload = {
-                participant_id: participantId,
-                mode: "ENROLL",
-                rounds: sessionRounds,
-                cognitive_data: cognitiveData // Injected into the final JSON bundle
+                participant_id: participantId, mode: "ENROLL",
+                rounds: sessionRounds, cognitive_data: cognitiveData
             };
 
             try {
                 const response = await fetch('/enroll', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
-                const data = await response.json();
-
-                if (response.ok) {
-                    showFeedback(`Data safely logged for ${participantId}!`, "var(--success-color)");
-                    idInput.value = "";
-                } else {
-                    showFeedback(`Error: ${data.detail}`, "var(--error-color)");
-                }
+                if (response.ok) document.getElementById('feedback-msg').innerHTML = `Operative <span style="color:var(--target-color)">${participantId}</span> Enrolled Successfully.`;
+                else document.getElementById('feedback-msg').innerText = "Upload Error.";
             } catch (error) {
-                showFeedback(`Connection failed. Is the server running?`, "var(--error-color)");
+                document.getElementById('feedback-msg').innerText = "Connection Failed.";
             }
         }
     </script>
