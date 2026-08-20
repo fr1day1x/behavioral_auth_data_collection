@@ -1,0 +1,6 @@
+{
+  "name": "Cyber-Breach Aim Trainer",
+  "description": "Behavioral biometric data collection and reaction game authentication prototype",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

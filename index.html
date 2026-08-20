@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber-Breach Aim Trainer</title>
+    <title>Behavioral Biometric Authentication Engine</title>
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -13,50 +13,182 @@
             --error-color: #ff004c;
             --success-color: #45a29e;
             --panel-bg: #1f2833;
+            --card-bg: #151b23;
         }
+
+        * { box-sizing: border-box; }
 
         body {
             margin: 0; padding: 0;
             background-color: var(--bg-color);
             color: var(--text-primary);
-            font-family: 'Courier New', Courier, monospace; /* Arcade Hacker aesthetic */
+            font-family: 'Courier New', Courier, monospace;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            min-height: 100vh; overflow: hidden; user-select: none;
+            min-height: 100vh; overflow-x: hidden; user-select: none;
+        }
+
+        /* Top Database Status Bar */
+        #db-status-bar {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: rgba(15, 20, 28, 0.95);
+            border-bottom: 1px solid rgba(102, 252, 241, 0.2);
+            padding: 8px 20px; font-size: 0.85rem;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 100;
+        }
+        .db-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .db-dot {
+            width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+        }
+        .db-dot.online { background-color: #00ff88; box-shadow: 0 0 8px #00ff88; }
+        .db-dot.fallback { background-color: #ffbb00; box-shadow: 0 0 8px #ffbb00; }
+        .db-dot.error { background-color: #ff004c; box-shadow: 0 0 8px #ff004c; }
+
+        .sync-btn {
+            background: transparent; border: 1px solid var(--success-color);
+            color: var(--success-color); font-family: inherit; font-size: 0.8rem;
+            padding: 4px 10px; cursor: pointer; border-radius: 3px;
+            margin-right: 8px; transition: all 0.2s ease;
+        }
+        .sync-btn:hover { background: var(--success-color); color: #000; }
+
+        .roster-toggle-btn {
+            background: transparent; border: 1px solid var(--target-color);
+            color: var(--target-color); font-family: inherit; font-size: 0.8rem;
+            padding: 4px 10px; cursor: pointer; border-radius: 3px;
+            transition: all 0.2s ease;
+        }
+        .roster-toggle-btn:hover {
+            background: var(--target-color); color: #000;
         }
 
         #menu-view, #game-view {
             display: flex; flex-direction: column;
-            align-items: center; width: 100%; max-width: 800px;
+            align-items: center; width: 100%; max-width: 860px;
+            margin-top: 50px; padding: 20px;
         }
 
         .hidden { display: none !important; }
 
         h1 {
-            font-size: 3rem; color: var(--target-color);
-            text-shadow: 0 0 10px var(--target-shadow);
-            margin-bottom: 1rem; text-transform: uppercase;
+            font-size: 2.1rem; color: var(--target-color);
+            text-shadow: 0 0 12px var(--target-shadow);
+            margin: 0 0 2rem 0; text-transform: uppercase; letter-spacing: 2px;
+            text-align: center; line-height: 1.3; max-width: 800px;
         }
 
-        .subtitle { color: var(--text-primary); margin-bottom: 3rem; font-size: 1.2rem; }
+        .mode-selector {
+            display: flex; gap: 12px; margin-bottom: 1.6rem; flex-wrap: wrap; justify-content: center;
+        }
+        .mode-btn {
+            background: var(--panel-bg); border: 2px solid var(--text-primary);
+            color: var(--text-primary); padding: 9px 18px; font-family: inherit;
+            font-size: 0.95rem; cursor: pointer; text-transform: uppercase;
+            border-radius: 4px; transition: all 0.2s ease;
+        }
+        .mode-btn.active {
+            border-color: var(--target-color); color: var(--target-color);
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.4); font-weight: bold;
+        }
+        .mode-btn:hover {
+            border-color: var(--target-color); color: var(--target-color);
+        }
 
-        .input-group { text-align: center; margin-bottom: 1.5rem; }
-        .input-label { display: block; margin-bottom: 10px; font-size: 1.2rem; }
+        .input-group { text-align: center; margin-bottom: 1.2rem; width: 100%; max-width: 440px; }
+        .input-label { display: block; margin-bottom: 8px; font-size: 1.1rem; }
         
         input {
-            background: var(--panel-bg); border: 2px solid var(--target-color);
-            color: var(--target-color); font-size: 1.5rem; font-family: inherit;
-            padding: 10px; text-align: center; text-transform: uppercase;
+            width: 100%; background: var(--panel-bg); border: 2px solid var(--target-color);
+            color: var(--target-color); font-size: 1.4rem; font-family: inherit;
+            padding: 10px 14px; text-align: center; text-transform: uppercase;
             outline: none; box-shadow: 0 0 15px rgba(102, 252, 241, 0.2);
+            border-radius: 4px;
         }
 
-        .hint-text { margin-top: 15px; font-size: 1rem; opacity: 0.7; }
-        #feedback-msg { margin-top: 2rem; font-size: 1.2rem; height: 1.5rem; font-weight: bold; }
+        .quick-chips-container {
+            margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;
+            justify-content: center; max-width: 500px;
+        }
+        .quick-chip {
+            background: rgba(31, 40, 51, 0.9); border: 1px solid rgba(102, 252, 241, 0.4);
+            color: var(--text-primary); font-size: 0.75rem; padding: 3px 8px;
+            border-radius: 3px; cursor: pointer; transition: all 0.15s ease;
+        }
+        .quick-chip:hover {
+            border-color: var(--target-color); color: var(--target-color);
+            background: rgba(102, 252, 241, 0.1);
+        }
+
+        .start-btn {
+            background: var(--target-color); color: #000; border: none;
+            padding: 12px 32px; font-family: inherit; font-size: 1.15rem;
+            font-weight: bold; cursor: pointer; text-transform: uppercase;
+            border-radius: 4px; box-shadow: 0 0 20px var(--target-shadow);
+            margin-top: 15px; transition: transform 0.1s ease;
+        }
+        .start-btn:hover { transform: scale(1.03); }
+        .start-btn:active { transform: scale(0.97); }
+
+        .hint-text { margin-top: 12px; font-size: 0.9rem; opacity: 0.7; }
+        #feedback-msg {
+            margin-top: 1.5rem; font-size: 1.05rem; min-height: 2.2rem;
+            font-weight: bold; text-align: center; line-height: 1.5;
+        }
+        #enrolled-status {
+            font-size: 0.9rem; color: var(--text-primary); margin-top: 10px;
+            min-height: 1.2rem; text-align: center;
+        }
+
+        /* --- OPERATIVES ROSTER MODAL --- */
+        #roster-modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 200;
+        }
+        .roster-card {
+            background: var(--card-bg); border: 2px solid var(--target-color);
+            border-radius: 8px; width: 90%; max-width: 680px; max-height: 80vh;
+            display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(102, 252, 241, 0.3);
+            overflow: hidden;
+        }
+        .roster-header {
+            padding: 16px 20px; border-bottom: 1px solid rgba(102, 252, 241, 0.3);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .roster-header h2 { margin: 0; font-size: 1.3rem; color: var(--target-color); }
+        .close-btn {
+            background: none; border: none; color: var(--text-primary);
+            font-size: 1.5rem; cursor: pointer;
+        }
+        .close-btn:hover { color: var(--error-color); }
+        .roster-body {
+            padding: 16px 20px; overflow-y: auto; flex: 1;
+        }
+        .roster-table {
+            width: 100%; border-collapse: collapse; font-size: 0.85rem;
+        }
+        .roster-table th, .roster-table td {
+            padding: 8px 10px; text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .roster-table th {
+            color: var(--target-color); text-transform: uppercase; font-size: 0.8rem;
+        }
+        .select-op-btn {
+            background: var(--panel-bg); border: 1px solid var(--target-color);
+            color: var(--target-color); padding: 4px 8px; font-family: inherit;
+            font-size: 0.75rem; cursor: pointer; border-radius: 3px;
+        }
+        .select-op-btn:hover { background: var(--target-color); color: #000; }
 
         /* --- GAME HUD --- */
         #hud {
             display: flex; justify-content: space-between;
-            width: 600px; margin-bottom: 10px; font-size: 1.2rem; font-weight: bold;
+            width: 600px; margin-bottom: 10px; font-size: 1.15rem; font-weight: bold;
         }
         .score-box { color: var(--target-color); }
         .acc-box { color: var(--success-color); }
@@ -69,13 +201,12 @@
         }
 
         #target-dot {
-            position: absolute; width: 60px; height: 60px;
+            position: absolute; width: 56px; height: 56px;
             background-color: var(--target-color); border-radius: 50%;
             cursor: crosshair; transform: translate(-50%, -50%);
             box-shadow: 0 0 20px var(--target-shadow);
         }
 
-        /* The shrinking timer ring */
         #target-ring {
             position: absolute; border: 2px solid var(--target-color);
             border-radius: 50%; top: -10px; left: -10px; right: -10px; bottom: -10px;
@@ -128,23 +259,74 @@
 </head>
 <body>
 
+    <!-- TOP DATABASE STATUS BAR -->
+    <div id="db-status-bar">
+        <div class="db-badge">
+            <span id="db-indicator-dot" class="db-dot fallback"></span>
+            <span id="db-status-label">Database: Initializing...</span>
+        </div>
+        <div>
+            <button type="button" class="sync-btn" onclick="refreshDatabaseSync()">⟳ Sync MongoDB</button>
+            <button type="button" class="roster-toggle-btn" onclick="toggleRosterModal(true)">
+                Database Operatives (<span id="roster-count-label">...</span>)
+            </button>
+        </div>
+    </div>
+
     <!-- MENU SCREEN -->
     <div id="menu-view">
-        <h1>Cyber-Breach</h1>
-        <div class="subtitle">Reaction & Synchronization Protocol</div>
-        <div class="input-group">
-            <span class="input-label">Enter Operative ID:</span>
-            <input type="text" id="participant-id" maxlength="10" autocomplete="off" autofocus>
+        <h1 id="app-title">Behavioral Biometric Authentication Engine</h1>
+        
+        <div class="mode-selector" id="mode-selector">
+            <button type="button" class="mode-btn active" id="mode-verify-btn" onclick="setAppMode('VERIFY')">Verify Protocol (1 Stage + PIN)</button>
+            <button type="button" class="mode-btn" id="mode-enroll-btn" onclick="setAppMode('ENROLL')">Enroll Protocol (3 Stages + PIN)</button>
         </div>
-        <div class="hint-text">Press [ENTER] to initiate sequence</div>
+
+        <div class="input-group">
+            <span class="input-label" id="id-label">Target Operative ID:</span>
+            <input type="text" id="participant-id" maxlength="16" autocomplete="off" autofocus placeholder="OPERATIVE_ID">
+            <div class="quick-chips-container" id="quick-chips">
+                <!-- Stored operatives chips will be injected here -->
+            </div>
+        </div>
+
+        <button type="button" id="start-sequence-btn" class="start-btn" onclick="initiateSequence()">Initiate Protocol</button>
+        <div class="hint-text" id="shortcut-hint">Or press [ENTER] to initiate sequence</div>
         <div id="feedback-msg"></div>
+        <div id="enrolled-status"></div>
+    </div>
+
+    <!-- SAVED OPERATIVES MODAL -->
+    <div id="roster-modal" class="hidden">
+        <div class="roster-card">
+            <div class="roster-header">
+                <h2>MongoDB Database Diagnostics & Roster</h2>
+                <button type="button" class="close-btn" onclick="toggleRosterModal(false)">&times;</button>
+            </div>
+            <div class="roster-body">
+                <div id="roster-db-info" style="font-size: 0.85rem; color: var(--target-color); margin-bottom: 12px; background: #0b0c10; padding: 10px; border-radius: 4px; border: 1px solid rgba(102, 252, 241, 0.2);"></div>
+                <table class="roster-table">
+                    <thead>
+                        <tr>
+                            <th>Operative ID</th>
+                            <th>Collection / Source</th>
+                            <th>Rounds</th>
+                            <th>Date Stored</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="roster-table-body">
+                        <tr><td colspan="5" style="text-align: center; opacity: 0.6;">Loading MongoDB operatives...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- GAME SCREEN -->
     <div id="game-view" class="hidden">
-        
         <div id="hud">
-            <div>Stage: <span id="round-text">1/3</span></div>
+            <div>Stage: <span id="round-text">1/1</span></div>
             <div class="score-box">Score: <span id="score-val">0</span></div>
             <div class="acc-box">Accuracy: <span id="acc-val">100</span>%</div>
         </div>
@@ -172,10 +354,10 @@
     </div>
 
     <script>
-        // --- TELEMETRY ENGINE (Unchanged Data Structures) ---
+        // --- HIGH-PRECISION KINEMATIC & TRAJECTORY TELEMETRY ENGINE ---
         let currentPath = [];
         let lastSampleTime = 0;
-        const SAMPLE_INTERVAL_MS = 10;
+        const SAMPLE_INTERVAL_MS = 8; // High frequency 125Hz sampling
         let isTrackingTrajectory = false;
         let currentMouseX = 0, currentMouseY = 0;
 
@@ -184,18 +366,173 @@
             if (!isTrackingTrajectory) return;
             const now = performance.now();
             if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
-                currentPath.push({ x: e.clientX, y: e.clientY });
+                currentPath.push({ x: e.clientX, y: e.clientY, t: now });
                 lastSampleTime = now;
             }
         });
         
         let appState = "MENU", participantId = "";
+        let selectedMode = "VERIFY";
         let targetsHit = 0, totalClicks = 0;
-        const maxTargets = 20; // 20 per round makes for a good arcade feel
-        let roundsCompleted = 0, maxRounds = 3;
+        const maxTargets = 20;
+        let roundsCompleted = 0, maxRounds = 1;
         let sessionRounds = [];
         let gameScore = 0;
-        
+        let cachedOperatives = [];
+
+        function setAppMode(mode) {
+            selectedMode = mode;
+            document.getElementById('mode-enroll-btn').classList.toggle('active', mode === 'ENROLL');
+            document.getElementById('mode-verify-btn').classList.toggle('active', mode === 'VERIFY');
+            document.getElementById('start-sequence-btn').innerText = mode === 'ENROLL' ? 'Initiate Enrollment' : 'Initiate Verification';
+            maxRounds = mode === 'ENROLL' ? 3 : 1;
+            checkEnrolledStatus();
+        }
+
+        async function refreshDatabaseSync() {
+            document.getElementById('db-status-label').innerHTML = `MongoDB: <strong>Syncing cluster...</strong>`;
+            try {
+                await fetch('/api/refresh', { method: 'POST' });
+            } catch (e) {}
+            await fetchDatabaseStatus();
+            await loadOperativesRoster();
+            checkEnrolledStatus();
+        }
+
+        async function fetchDatabaseStatus() {
+            try {
+                const res = await fetch('/api/status');
+                if (res.ok) {
+                    const data = await res.json();
+                    const dot = document.getElementById('db-indicator-dot');
+                    const label = document.getElementById('db-status-label');
+                    const countLabel = document.getElementById('roster-count-label');
+                    
+                    countLabel.innerText = `${data.total_operatives} Operatives`;
+                    
+                    if (data.connected) {
+                        dot.className = "db-dot online";
+                        const activeCol = data.active_collection ? ` / ${data.active_collection}` : '';
+                        label.innerHTML = `MongoDB: <strong style="color:#00ff88">Connected (${data.db_name}${activeCol})</strong>`;
+                    } else if (data.configured) {
+                        dot.className = "db-dot error";
+                        const err = data.error ? ` (${data.error})` : '';
+                        label.innerHTML = `MongoDB: <strong style="color:#ff004c">Auth/Network Error${err}</strong>`;
+                    } else {
+                        dot.className = "db-dot fallback";
+                        label.innerHTML = `MongoDB: <strong>Set MONGO_URI in Settings</strong>`;
+                    }
+                }
+            } catch (e) {
+                console.error('Status check failed', e);
+            }
+        }
+
+        async function loadOperativesRoster() {
+            try {
+                const res = await fetch('/api/operatives');
+                if (res.ok) {
+                    const data = await res.json();
+                    cachedOperatives = data.operatives || [];
+                    renderQuickChips(cachedOperatives);
+                    renderRosterTable(cachedOperatives, data.db_source, data.diagnostics);
+                    document.getElementById('roster-count-label').innerText = `${cachedOperatives.length} Operatives`;
+                }
+            } catch (e) {
+                console.error('Failed to load operatives', e);
+            }
+        }
+
+        function renderQuickChips(operatives) {
+            const container = document.getElementById('quick-chips');
+            container.innerHTML = '';
+            if (!operatives || operatives.length === 0) return;
+
+            const title = document.createElement('div');
+            title.style.width = '100%';
+            title.style.fontSize = '0.75rem';
+            title.style.opacity = '0.7';
+            title.innerText = 'Click any operative to verify against their biometric template:';
+            container.appendChild(title);
+
+            const displayed = operatives.slice(0, 10);
+            displayed.forEach(op => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'quick-chip';
+                chip.innerText = op.participant_id;
+                chip.onclick = () => selectOperative(op.participant_id);
+                container.appendChild(chip);
+            });
+        }
+
+        function renderRosterTable(operatives, dbSource, diag) {
+            const body = document.getElementById('roster-table-body');
+            const info = document.getElementById('roster-db-info');
+            
+            let diagHtml = `<div><strong>Status:</strong> ${dbSource || 'MongoDB'} | <strong>Total Operatives:</strong> ${operatives.length}</div>`;
+            if (diag) {
+                if (diag.collections && diag.collections.length > 0) {
+                    diagHtml += `<div style="margin-top:4px; font-size:0.75rem; color:#aaa;"><strong>Scanned Collections:</strong> ${diag.collections.join(', ')}</div>`;
+                }
+                if (diag.error) {
+                    diagHtml += `<div style="margin-top:4px; font-size:0.78rem; color:var(--error-color);"><strong>Connection Notice:</strong> ${diag.error}</div>`;
+                }
+            }
+            info.innerHTML = diagHtml;
+
+            if (!operatives || operatives.length === 0) {
+                body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-primary); padding: 20px;">No operatives found in your MongoDB collections yet.<br><br>Enter an ID in <strong>"Enroll Protocol"</strong> mode to complete a session and save directly to MongoDB.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = operatives.map(op => `
+                <tr>
+                    <td><strong style="color:var(--target-color)">${op.participant_id}</strong></td>
+                    <td>${op.source || 'MongoDB'}</td>
+                    <td>${op.rounds_count}</td>
+                    <td style="font-size:0.75rem; opacity:0.8;">${op.enrolled_at ? op.enrolled_at.split('T')[0] : 'Stored'}</td>
+                    <td>
+                        <button type="button" class="select-op-btn" onclick="selectOperative('${op.participant_id}')">Select to Verify</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function selectOperative(id) {
+            document.getElementById('participant-id').value = id;
+            setAppMode('VERIFY');
+            toggleRosterModal(false);
+            checkEnrolledStatus();
+        }
+
+        function toggleRosterModal(show) {
+            document.getElementById('roster-modal').classList.toggle('hidden', !show);
+            if (show) loadOperativesRoster();
+        }
+
+        async function checkEnrolledStatus() {
+            const idValue = document.getElementById('participant-id').value.trim().toUpperCase();
+            const statusEl = document.getElementById('enrolled-status');
+            if (!idValue) {
+                statusEl.innerHTML = "";
+                return;
+            }
+            try {
+                const res = await fetch(`/check/${encodeURIComponent(idValue)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.exists) {
+                        statusEl.innerHTML = `<span style="color:var(--success-color)">● Operative <strong>${idValue}</strong> FOUND in MongoDB. Biometrics armed for verification.</span>`;
+                    } else {
+                        statusEl.innerHTML = `<span style="color:var(--target-color)">○ Operative <strong>${idValue}</strong>: New profile. Switch to "Enroll Protocol" to capture biometrics and save to MongoDB.</span>`;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        document.getElementById('participant-id').addEventListener('input', checkEnrolledStatus);
+
         const gridPositions = [];
         const startX = 150, startY = 150, spacing = 100;
         for(let r=0; r<4; r++) {
@@ -213,219 +550,318 @@
             itis: { Adjacent: [], Diagonal: [], Medium: [], Long: [] },
             dwell_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
             path_efficiencies: [],
-            x_offsets: [], y_offsets: [], total_errors: 0
+            x_offsets: [], y_offsets: [], total_errors: 0,
+            mean_velocities: [], peak_velocities: [],
+            mean_accelerations: [], mean_jerks: [],
+            angular_changes: [], overshoot_counts: [],
+            time_to_peak_vel_ratios: []
         };
 
-        // --- COGNITIVE DATA ---
         let cognitivePhase = 0; 
         let currentPinTarget = "", currentPinInput = "";
         let pinClickTimestamps = [];
         let cognitiveData = {
-            familiar: { flight_times: [], path_efficiencies: [] },
-            unfamiliar: { flight_times: [], path_efficiencies: [] }
+            familiar: { flight_times: [], path_efficiencies: [], mean_velocities: [] },
+            unfamiliar: { flight_times: [], path_efficiencies: [], mean_velocities: [] }
         };
 
         const menuView = document.getElementById('menu-view'), gameView = document.getElementById('game-view');
         const targetDot = document.getElementById('target-dot'), canvasContainer = document.getElementById('canvas-container');
         const scoreVal = document.getElementById('score-val'), accVal = document.getElementById('acc-val');
 
+        function initiateSequence() {
+            const idValue = document.getElementById('participant-id').value.trim().toUpperCase();
+            if (idValue.length > 0) executeDataAcquisition(idValue);
+            else document.getElementById('feedback-msg').innerText = "Operative ID Required.";
+        }
+
         window.addEventListener('keydown', (e) => {
             if (appState !== "MENU") return;
-            if (e.key === "Enter") {
-                const idValue = document.getElementById('participant-id').value.trim().toUpperCase();
-                if (idValue.length > 0) executeDataAcquisition(idValue);
-                else document.getElementById('feedback-msg').innerText = "Operative ID Required.";
-            }
+            if (e.key === "Enter") initiateSequence();
         });
 
         async function executeDataAcquisition(id) {
-            document.getElementById('feedback-msg').innerText = "Connecting to mainframe...";
+            document.getElementById('feedback-msg').innerText = "Connecting to biometric mainframe...";
             try {
-                // await fetch(`/check/${id}`); // Removed for pure client-side testing, add back if checking IDs
                 participantId = id; roundsCompleted = 0; gameScore = 0; totalClicks = 0;
+                maxRounds = selectedMode === 'ENROLL' ? 3 : 1;
                 appState = "COLLECT"; sessionRounds = [];
+                cognitiveData = {
+                    familiar: { flight_times: [], path_efficiencies: [], mean_velocities: [] },
+                    unfamiliar: { flight_times: [], path_efficiencies: [], mean_velocities: [] }
+                };
                 startNewRound();
             } catch (error) {
-                document.getElementById('feedback-msg').innerText = "Connection Failed.";
+                document.getElementById('feedback-msg').innerText = "Mainframe Connection Error.";
             }
         }
 
         function startNewRound() {
-            targetsHit = 0;
+            targetsHit = 0; previousTargetIndex = -1;
             rawSessionData = {
                 reaction_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
                 itis: { Adjacent: [], Diagonal: [], Medium: [], Long: [] },
                 dwell_times: { Adjacent: [], Diagonal: [], Medium: [], Long: [], First: [] },
-                path_efficiencies: [], x_offsets: [], y_offsets: [], total_errors: 0
+                path_efficiencies: [],
+                x_offsets: [], y_offsets: [], total_errors: 0,
+                mean_velocities: [], peak_velocities: [],
+                mean_accelerations: [], mean_jerks: [],
+                angular_changes: [], overshoot_counts: [],
+                time_to_peak_vel_ratios: []
             };
-
-            menuView.classList.add('hidden'); gameView.classList.remove('hidden');
-            canvasContainer.classList.remove('hidden');
-            document.getElementById('hud').classList.remove('hidden');
-            document.getElementById('keypad-container').classList.add('hidden');
-            document.getElementById('pin-prompt').classList.add('hidden');
-
-            updateOverlay(); spawnTarget(true);
-        }
-
-        function updateOverlay() {
-            document.getElementById('round-text').innerText = `${roundsCompleted + 1}/${maxRounds}`;
-            scoreVal.innerText = gameScore;
-            let accuracy = totalClicks === 0 ? 100 : Math.round(((totalClicks - rawSessionData.total_errors) / totalClicks) * 100);
-            accVal.innerText = accuracy;
-            accVal.style.color = accuracy < 80 ? 'var(--error-color)' : 'var(--success-color)';
-        }
-
-        function spawnTarget(isFirst = false) {
-            if (timeoutTimer) clearTimeout(timeoutTimer);
-            targetDot.classList.add('hidden');
-
-            if (targetsHit >= maxTargets) { processRoundCompletion(); return; }
-
-            let newIndex = Math.floor(Math.random() * 16);
-            if (!isFirst) while (newIndex === activeTargetIndex) newIndex = Math.floor(Math.random() * 16);
-            activeTargetIndex = newIndex;
-
-            const delay = isFirst ? 500 : Math.floor(Math.random() * 400) + 200; // Faster arcade pacing
-            setTimeout(() => {
-                const pos = gridPositions[activeTargetIndex];
-                targetDot.style.left = `${pos.x}px`; targetDot.style.top = `${pos.y}px`;
-                
-                // Restart animation ring
-                const ring = document.getElementById('target-ring');
-                ring.style.animation = 'none'; ring.offsetHeight; ring.style.animation = null;
-
-                targetDot.classList.remove('hidden');
-                targetSpawnTime = performance.now();
-                if (targetsHit === 0) lastClickTime = targetSpawnTime;
-
-                currentPath = [{ x: currentMouseX, y: currentMouseY }];
-                lastSampleTime = targetSpawnTime; isTrackingTrajectory = true;
-
-                timeoutTimer = setTimeout(handleTimeout, 1500); // 1.5 seconds to hit it
-            }, delay);
-        }
-
-        targetDot.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return; 
-            e.stopPropagation(); 
-            mouseDownTime = performance.now();
-            totalClicks++;
-        });
-
-        targetDot.addEventListener('mouseup', (e) => {
-            if (e.button !== 0) return; e.stopPropagation();
-            isTrackingTrajectory = false; currentPath.push({ x: e.clientX, y: e.clientY });
-
-            const clickUpTime = performance.now();
-            const dwellTime = clickUpTime - mouseDownTime;
-            const reactionTime = mouseDownTime - targetSpawnTime;
             
-            gameScore += Math.max(10, 500 - Math.floor(reactionTime)); // Faster = more points
-
-            const rect = targetDot.getBoundingClientRect();
-            const xOffset = e.clientX - (rect.left + rect.width / 2);
-            const yOffset = e.clientY - (rect.top + rect.height / 2);
-
-            let pathEfficiency = calculateSegmentEfficiency(currentPath, e.clientX, e.clientY);
-
-            if (targetsHit < 3) {
-                // Warmup
-            } else if (targetsHit === 3) {
-                rawSessionData.reaction_times.First.push(reactionTime);
-                rawSessionData.dwell_times.First.push(dwellTime);
-                rawSessionData.x_offsets.push(xOffset); rawSessionData.y_offsets.push(yOffset);
-                rawSessionData.path_efficiencies.push(pathEfficiency);
-            } else {
-                const iti = mouseDownTime - lastClickTime;
-                const jumpType = calculateJumpType(previousTargetIndex, activeTargetIndex);
-                rawSessionData.reaction_times[jumpType].push(reactionTime);
-                rawSessionData.itis[jumpType].push(iti);
-                rawSessionData.dwell_times[jumpType].push(dwellTime);
-                rawSessionData.x_offsets.push(xOffset); rawSessionData.y_offsets.push(yOffset);
-                rawSessionData.path_efficiencies.push(pathEfficiency);
-            }
-
-            previousTargetIndex = activeTargetIndex; lastClickTime = mouseDownTime;
-            targetsHit++; updateOverlay(); spawnTarget();
-        });
-
-        canvasContainer.addEventListener('mousedown', () => {
-            if (appState === "MENU" || targetDot.classList.contains('hidden') || cognitivePhase !== 0) return;
-            totalClicks++; handleMiss();
-        });
-
-        function handleMiss() {
-            rawSessionData.total_errors++;
-            gameScore = Math.max(0, gameScore - 50); // Penalty
-            canvasContainer.classList.add('flash-red');
-            setTimeout(() => canvasContainer.classList.remove('flash-red'), 150);
-            updateOverlay();
+            document.getElementById('round-text').innerText = `${roundsCompleted + 1}/${maxRounds}`;
+            menuView.classList.add('hidden'); gameView.classList.remove('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            
+            setTimeout(spawnNextTarget, 800);
         }
 
-        function handleTimeout() {
-            totalClicks++; handleMiss(); spawnTarget();
-        }
-
-        function calculateJumpType(i1, i2) {
-            const r1 = Math.floor(i1 / 4), c1 = i1 % 4;
-            const r2 = Math.floor(i2 / 4), c2 = i2 % 4;
-            const gridDist = Math.hypot(r2 - r1, c2 - c1);
-            if (gridDist === 1.0) return "Adjacent";
-            if (gridDist > 1.0 && gridDist <= 1.5) return "Diagonal";
-            if (gridDist > 1.5 && gridDist <= 2.5) return "Medium";
+        function getDistanceBucket(idx1, idx2) {
+            if (idx1 === -1) return "First";
+            const r1 = Math.floor(idx1 / 4), c1 = idx1 % 4;
+            const r2 = Math.floor(idx2 / 4), c2 = idx2 % 4;
+            const d = Math.hypot(r1 - r2, c1 - c2);
+            if (d <= 1.05) return "Adjacent";
+            if (d <= 1.45) return "Diagonal";
+            if (d <= 2.25) return "Medium";
             return "Long";
         }
 
-        function processRoundCompletion() {
-            sessionRounds.push(rawSessionData); roundsCompleted++;
+        /**
+         * Comprehensive Kinematic Trajectory Analysis
+         */
+        function analyzeKinematics(path, startPos, endPos) {
+            if (!path || path.length < 3) {
+                return {
+                    efficiency: 1.0, meanVelocity: 0.5, peakVelocity: 0.8,
+                    meanAcceleration: 0.01, meanJerk: 0.001,
+                    angularChange: 0.2, overshoots: 0, timeToPeakRatio: 0.4
+                };
+            }
+
+            const dStraight = Math.hypot(endPos.x - startPos.x, endPos.y - startPos.y);
+            let dActual = 0;
+            const velocities = [];
+            const accelerations = [];
+            const jerks = [];
+            let totalAngleChange = 0;
+            let overshoots = 0;
+            let peakVel = 0;
+            let peakVelTime = path[0].t;
+
+            const targetDistance = Math.hypot(endPos.x - startPos.x, endPos.y - startPos.y);
+
+            for (let i = 1; i < path.length; i++) {
+                const p0 = path[i - 1];
+                const p1 = path[i];
+                const segDist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+                dActual += segDist;
+
+                const dt = Math.max(1, p1.t - p0.t);
+                const vel = segDist / dt; // px/ms
+                velocities.push(vel);
+
+                if (vel > peakVel) {
+                    peakVel = vel;
+                    peakVelTime = p1.t;
+                }
+
+                // Check overshoots (distance to target increased after getting close)
+                const distToTarget = Math.hypot(p1.x - endPos.x, p1.y - endPos.y);
+                if (distToTarget < 40 && i < path.length - 2) {
+                    const nextDist = Math.hypot(path[i+1].x - endPos.x, path[i+1].y - endPos.y);
+                    if (nextDist > distToTarget + 5) overshoots++;
+                }
+
+                if (i >= 2) {
+                    const pPrev = path[i - 2];
+                    const vPrev = velocities[i - 2];
+                    const dtAcc = Math.max(1, p1.t - p0.t);
+                    const acc = Math.abs(vel - vPrev) / dtAcc;
+                    accelerations.push(acc);
+
+                    // Angle change
+                    const angle1 = Math.atan2(p0.y - pPrev.y, p0.x - pPrev.x);
+                    const angle2 = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+                    let diffAngle = Math.abs(angle2 - angle1);
+                    if (diffAngle > Math.PI) diffAngle = 2 * Math.PI - diffAngle;
+                    totalAngleChange += diffAngle;
+                }
+
+                if (accelerations.length >= 2) {
+                    const aCurrent = accelerations[accelerations.length - 1];
+                    const aPrev = accelerations[accelerations.length - 2];
+                    const jerk = Math.abs(aCurrent - aPrev) / dt;
+                    jerks.push(jerk);
+                }
+            }
+
+            const totalTime = Math.max(1, path[path.length - 1].t - path[0].t);
+            const timeToPeakRatio = (peakVelTime - path[0].t) / totalTime;
+            const efficiency = dActual > 0 ? Number((dStraight / dActual).toFixed(4)) : 1.0;
+            const meanVelocity = velocities.length > 0 ? velocities.reduce((a, b) => a + b, 0) / velocities.length : 0.5;
+            const meanAcceleration = accelerations.length > 0 ? accelerations.reduce((a, b) => a + b, 0) / accelerations.length : 0.01;
+            const meanJerk = jerks.length > 0 ? jerks.reduce((a, b) => a + b, 0) / jerks.length : 0.001;
+
+            return {
+                efficiency,
+                meanVelocity: Number(meanVelocity.toFixed(4)),
+                peakVelocity: Number(peakVel.toFixed(4)),
+                meanAcceleration: Number(meanAcceleration.toFixed(5)),
+                meanJerk: Number(meanJerk.toFixed(6)),
+                angularChange: Number(totalAngleChange.toFixed(3)),
+                overshoots,
+                timeToPeakRatio: Number(timeToPeakRatio.toFixed(3))
+            };
+        }
+
+        function spawnNextTarget() {
+            if (targetsHit >= maxTargets) {
+                endRound(); return;
+            }
+
+            let nextIndex;
+            do {
+                nextIndex = Math.floor(Math.random() * 16);
+            } while (nextIndex === activeTargetIndex);
+
+            activeTargetIndex = nextIndex;
+            const pos = gridPositions[activeTargetIndex];
+            
+            targetDot.style.left = `${pos.x}px`; targetDot.style.top = `${pos.y}px`;
+            
+            const oldRing = document.getElementById('target-ring');
+            if (oldRing) oldRing.remove();
+            const ring = document.createElement('div');
+            ring.id = 'target-ring';
+            targetDot.appendChild(ring);
+            
+            targetDot.classList.remove('hidden');
+            
+            targetSpawnTime = performance.now();
+            currentPath = [{ x: currentMouseX, y: currentMouseY, t: targetSpawnTime }];
+            lastSampleTime = targetSpawnTime;
+            isTrackingTrajectory = true;
+
+            clearTimeout(timeoutTimer);
+            timeoutTimer = setTimeout(() => {
+                if (targetDot.classList.contains('hidden')) return;
+                rawSessionData.total_errors++;
+                canvasContainer.classList.add('flash-red');
+                setTimeout(() => canvasContainer.classList.remove('flash-red'), 200);
+                targetDot.classList.add('hidden');
+                isTrackingTrajectory = false;
+                setTimeout(spawnNextTarget, 300);
+            }, 1500);
+        }
+
+        canvasContainer.addEventListener('mousedown', (e) => {
+            if (appState !== "COLLECT") return;
+            mouseDownTime = performance.now();
+            totalClicks++;
+            if (e.target !== targetDot && !targetDot.contains(e.target)) {
+                rawSessionData.total_errors++;
+                gameScore = Math.max(0, gameScore - 50);
+                scoreVal.innerText = gameScore;
+                accVal.innerText = Math.round((targetsHit / totalClicks) * 100);
+                canvasContainer.classList.add('flash-red');
+                setTimeout(() => canvasContainer.classList.remove('flash-red'), 200);
+            }
+        });
+
+        targetDot.addEventListener('mouseup', (e) => {
+            if (appState !== "COLLECT" || targetDot.classList.contains('hidden')) return;
+            clearTimeout(timeoutTimer);
+            
+            const upTime = performance.now();
+            const reactionTime = mouseDownTime - targetSpawnTime;
+            const dwellTime = upTime - mouseDownTime;
+            const iti = lastClickTime > 0 ? (mouseDownTime - lastClickTime) : 0;
+            lastClickTime = upTime;
+            
+            isTrackingTrajectory = false;
+            currentPath.push({ x: e.clientX, y: e.clientY, t: upTime });
+
+            const targetPos = gridPositions[activeTargetIndex];
+            const startPos = previousTargetIndex >= 0 ? gridPositions[previousTargetIndex] : { x: currentPath[0]?.x || 0, y: currentPath[0]?.y || 0 };
+            
+            // Extract rich trajectory kinematics
+            const kin = analyzeKinematics(currentPath, startPos, targetPos);
+            rawSessionData.path_efficiencies.push(kin.efficiency);
+            rawSessionData.mean_velocities.push(kin.meanVelocity);
+            rawSessionData.peak_velocities.push(kin.peakVelocity);
+            rawSessionData.mean_accelerations.push(kin.meanAcceleration);
+            rawSessionData.mean_jerks.push(kin.meanJerk);
+            rawSessionData.angular_changes.push(kin.angularChange);
+            rawSessionData.overshoot_counts.push(kin.overshoots);
+            rawSessionData.time_to_peak_vel_ratios.push(kin.timeToPeakRatio);
+            
+            const rect = targetDot.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2, centerY = rect.top + rect.height / 2;
+            const xOffset = e.clientX - centerX, yOffset = e.clientY - centerY;
+            rawSessionData.x_offsets.push(Number(xOffset.toFixed(2)));
+            rawSessionData.y_offsets.push(Number(yOffset.toFixed(2)));
+
+            const bucket = getDistanceBucket(previousTargetIndex, activeTargetIndex);
+            if (bucket !== "First") {
+                rawSessionData.reaction_times[bucket].push(Number(reactionTime.toFixed(2)));
+                rawSessionData.dwell_times[bucket].push(Number(dwellTime.toFixed(2)));
+                rawSessionData.itis[bucket].push(Number(iti.toFixed(2)));
+            }
+            
+            previousTargetIndex = activeTargetIndex;
+            targetsHit++;
+            gameScore += Math.max(10, Math.round(1000 - reactionTime));
+            scoreVal.innerText = gameScore;
+            accVal.innerText = Math.round((targetsHit / totalClicks) * 100);
+
+            targetDot.classList.add('hidden');
+            setTimeout(spawnNextTarget, Math.floor(Math.random() * 200) + 150);
+        });
+
+        function endRound() {
+            roundsCompleted++;
+            sessionRounds.push(rawSessionData);
+            
             if (roundsCompleted < maxRounds) {
                 canvasContainer.classList.add('flash-green');
                 setTimeout(() => {
-                    canvasContainer.classList.remove('flash-green'); startNewRound();
-                }, 1500);
+                    canvasContainer.classList.remove('flash-green');
+                    startNewRound();
+                }, 1200);
             } else {
                 document.getElementById('hud').classList.add('hidden');
-                setTimeout(startCognitiveTest, 1000);
+                setTimeout(startCognitiveTest, 600);
             }
         }
 
-        // --- BOSS STAGE: COGNITIVE MINIGAME ---
         function startCognitiveTest() {
-            targetDot.classList.add('hidden');
-            document.getElementById('keypad-container').classList.remove('hidden');
             document.getElementById('pin-prompt').classList.remove('hidden');
-            startFamiliarPhase();
-        }
-
-        function startFamiliarPhase() {
-            cognitivePhase = 1; currentPinTarget = "1234"; 
-            document.getElementById('pin-prompt').innerHTML = `DEFAULT PROTOCOL<span id="target-pin">${currentPinTarget}</span>`;
+            document.getElementById('keypad-container').classList.remove('hidden');
+            cognitivePhase = 1;
+            currentPinTarget = "1379";
+            document.getElementById('target-pin').innerText = currentPinTarget;
             resetPinTracking();
         }
 
         function startUnfamiliarPhase() {
-            cognitivePhase = 2; currentPinTarget = Math.floor(1000 + Math.random() * 9000).toString();
-            document.getElementById('pin-prompt').innerHTML = `DECRYPTION KEY<span id="target-pin">${currentPinTarget}</span>`;
+            cognitivePhase = 2;
+            currentPinTarget = generateRandomPin();
+            document.getElementById('target-pin').innerText = currentPinTarget;
             resetPinTracking();
+        }
+
+        function generateRandomPin() {
+            let pin = "";
+            for (let i = 0; i < 4; i++) pin += Math.floor(Math.random() * 10).toString();
+            return pin;
         }
 
         function resetPinTracking() {
             currentPinInput = ""; pinClickTimestamps = [];
-            currentPath = [{ x: currentMouseX, y: currentMouseY }];
+            currentPath = [{ x: currentMouseX, y: currentMouseY, t: performance.now() }];
             lastSampleTime = performance.now(); isTrackingTrajectory = true; 
-        }
-
-        function calculateSegmentEfficiency(pathObj, endX, endY) {
-            if (pathObj.length < 2) return 1.0;
-            const start = pathObj[0]; const end = { x: endX, y: endY };
-            const dStraight = Math.hypot(end.x - start.x, end.y - start.y);
-            let dActual = 0;
-            for (let i = 1; i < pathObj.length; i++) {
-                dActual += Math.hypot(pathObj[i].x - pathObj[i - 1].x, pathObj[i].y - pathObj[i - 1].y);
-            }
-            dActual += Math.hypot(end.x - pathObj[pathObj.length - 1].x, end.y - pathObj[pathObj.length - 1].y);
-            return dActual > 0 ? Number((dStraight / dActual).toFixed(4)) : 1.0;
         }
 
         document.querySelectorAll('.keypad-btn').forEach(btn => {
@@ -441,17 +877,21 @@
                     const flightTime = clickTime - pinClickTimestamps[pinClickTimestamps.length - 2];
                     const phaseKey = cognitivePhase === 1 ? 'familiar' : 'unfamiliar';
                     cognitiveData[phaseKey].flight_times.push(Number(flightTime.toFixed(2)));
-                    const segmentEfficiency = calculateSegmentEfficiency(currentPath, e.clientX, e.clientY);
-                    cognitiveData[phaseKey].path_efficiencies.push(segmentEfficiency);
+                    const startP = currentPath[0] || { x: e.clientX, y: e.clientY };
+                    const kin = analyzeKinematics(currentPath, startP, { x: e.clientX, y: e.clientY });
+                    cognitiveData[phaseKey].path_efficiencies.push(kin.efficiency);
+                    cognitiveData[phaseKey].mean_velocities.push(kin.meanVelocity);
                 }
                 
-                currentPath = [{ x: e.clientX, y: e.clientY }];
+                currentPath = [{ x: e.clientX, y: e.clientY, t: clickTime }];
                 
                 if (currentPinInput.length === 4) {
                     if (cognitivePhase === 1) {
-                        setTimeout(startUnfamiliarPhase, 500);
+                        setTimeout(startUnfamiliarPhase, 400);
                     } else {
                         isTrackingTrajectory = false; cognitivePhase = 0; 
+                        document.getElementById('pin-prompt').classList.add('hidden');
+                        document.getElementById('keypad-container').classList.add('hidden');
                         sendPayloadToCloud();
                     }
                 }
@@ -460,25 +900,54 @@
 
         async function sendPayloadToCloud() {
             gameView.classList.add('hidden'); menuView.classList.remove('hidden');
-            document.getElementById('feedback-msg').innerText = "Transmitting Telemetry...";
+            document.getElementById('feedback-msg').innerHTML = `<span style="color:var(--target-color)">Evaluating 28-dimensional biometric profile...</span>`;
             appState = "MENU";
 
             const payload = {
-                participant_id: participantId, mode: "ENROLL",
-                rounds: sessionRounds, cognitive_data: cognitiveData
+                participant_id: participantId,
+                mode: selectedMode,
+                rounds: sessionRounds,
+                cognitive_data: cognitiveData
             };
 
+            const endpoint = selectedMode === "ENROLL" ? "/enroll" : "/verify";
+
             try {
-                const response = await fetch('/enroll', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (response.ok) document.getElementById('feedback-msg').innerHTML = `Operative <span style="color:var(--target-color)">${participantId}</span> Enrolled Successfully.`;
-                else document.getElementById('feedback-msg').innerText = "Upload Error.";
+                const result = await response.json();
+                
+                if (response.ok) {
+                    if (selectedMode === "ENROLL") {
+                        const mongoNote = result.saved_to_mongo ? ' <span style="color:var(--success-color)">(Persisted to MongoDB)</span>' : '';
+                        document.getElementById('feedback-msg').innerHTML = 
+                            `Operative <span style="color:var(--target-color)">${participantId}</span> Enrolled Successfully${mongoNote}.<br><span style="font-size:0.85rem; opacity:0.85;">28-Dimensional Biometric Profile Generated & Calibrated across ${payload.rounds.length} rounds.</span>`;
+                    } else {
+                        if (result.match) {
+                            document.getElementById('feedback-msg').innerHTML = 
+                                `<span style="color:var(--success-color); font-size:1.3rem;">[ ACCESS GRANTED ]</span><br>Biometric Match Confirmed for Operative <strong>${participantId}</strong><br><span style="font-size:0.85rem; opacity:0.85;">Biometric Distance: <strong>${result.score}</strong> (Security Threshold: ${result.threshold}) | Confidence: ${result.confidence}</span>`;
+                        } else {
+                            document.getElementById('feedback-msg').innerHTML = 
+                                `<span style="color:var(--error-color); font-size:1.3rem;">[ ACCESS DENIED - IMPOSTOR DETECTED ]</span><br>Behavioral Telemetry Diverges from Operative <strong>${participantId}</strong>'s Stored Template<br><span style="font-size:0.85rem; opacity:0.85;">Biometric Distance: <strong>${result.score}</strong> (Security Cutoff: ${result.threshold})</span>`;
+                        }
+                    }
+                    checkEnrolledStatus();
+                    loadOperativesRoster();
+                } else {
+                    document.getElementById('feedback-msg').innerHTML = `<span style="color:var(--error-color)">[ REJECTED ] ${result.message || result.error || 'Request failed'}</span>`;
+                }
             } catch (error) {
-                document.getElementById('feedback-msg').innerText = "Connection Failed.";
+                document.getElementById('feedback-msg').innerText = "Connection to server failed.";
             }
         }
+
+        // Initialize on load
+        fetchDatabaseStatus();
+        loadOperativesRoster();
+        setAppMode('VERIFY');
     </script>
 </body>
 </html>
