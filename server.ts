@@ -69,9 +69,9 @@ interface MongoDiagnostics {
   connection_uri_type: string;
 }
 
-function getMongoUri(): string | undefined {
-  const uri = process.env.MONGO_URI || process.env.MONGODB_URI;
-  return uri ? uri.trim() : undefined;
+function getMongoUri(): string {
+  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb+srv://koolp:adminadmin@cluster0.o5k4k.mongodb.net/neuro_defense_db?retryWrites=true&w=majority';
+  return uri.trim();
 }
 
 function getUriType(uri?: string): string {
@@ -377,24 +377,30 @@ async function syncFromMongoDB(force = false): Promise<MongoDiagnostics> {
     let totalLoaded = 0;
     const allScannedCollections: string[] = [];
 
-    mongoDb = mongoClient.db();
-    let primaryDbName = mongoDb.databaseName || '';
-
-    let dbsToScan: string[] = [];
+    // Safely assign default database to avoid MongoDriverError if URI has no DB specified
     try {
-      const adminDb = mongoClient.db().admin();
-      const dbList = await adminDb.listDatabases();
-      dbsToScan = dbList.databases
-        .map((d: any) => d.name)
-        .filter((name: string) => !['local', 'config'].includes(name));
-    } catch (e) {
-      // Cluster list databases restricted
+      mongoDb = mongoClient.db('neuro_defense_db');
+    } catch {
+      mongoDb = mongoClient.db('test');
     }
+    let primaryDbName = mongoDb?.databaseName || 'neuro_defense_db';
 
-    if (dbsToScan.length === 0 && primaryDbName) {
-      dbsToScan = [primaryDbName];
-    } else if (primaryDbName && !dbsToScan.includes(primaryDbName)) {
-      dbsToScan.unshift(primaryDbName);
+    let dbsToScan: string[] = [primaryDbName];
+    try {
+      const adminDb = mongoClient.db('admin').admin();
+      const dbList = await adminDb.listDatabases();
+      const availableDbs = dbList.databases
+        .map((d: any) => d.name)
+        .filter((name: string) => !['local', 'config', 'admin'].includes(name));
+      if (availableDbs.length > 0) {
+        dbsToScan = availableDbs;
+        if (!dbsToScan.includes(primaryDbName)) {
+          mongoDb = mongoClient.db(dbsToScan[0]);
+          primaryDbName = dbsToScan[0];
+        }
+      }
+    } catch (e) {
+      // Cluster list databases restricted or not permitted, use primaryDbName
     }
 
     let activeCollectionName = 'operatives';

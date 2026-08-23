@@ -256,16 +256,19 @@ def sync_from_mongodb(force: bool = False) -> Dict[str, Any]:
         
         # Test server connection
         mongo_client.admin.command('ping')
-        mongo_db = mongo_client.get_default_database()
-        if mongo_db is None or mongo_db.name == "test":
-            mongo_db = mongo_client["neuro_defense_db"]
-
+        # Safely assign database without throwing ConfigurationError
+        mongo_db = mongo_client["neuro_defense_db"]
         primary_db_name = mongo_db.name
         dbs_to_scan = [primary_db_name]
 
         try:
             db_list = mongo_client.list_database_names()
-            dbs_to_scan = [d for d in db_list if d not in ["admin", "local", "config"]]
+            user_dbs = [d for d in db_list if d not in ["admin", "local", "config"]]
+            if user_dbs:
+                dbs_to_scan = user_dbs
+                if primary_db_name not in user_dbs:
+                    mongo_db = mongo_client[user_dbs[0]]
+                    primary_db_name = user_dbs[0]
             if primary_db_name not in dbs_to_scan:
                 dbs_to_scan.insert(0, primary_db_name)
         except Exception:
