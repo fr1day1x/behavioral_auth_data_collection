@@ -30,7 +30,7 @@ last_sync_timestamp = 0
 def get_mongo_uri() -> str:
     return os.getenv(
         "MONGO_URI",
-        "mongodb+srv://koolp:adminadmin@cluster0.o5k4k.mongodb.net/test?retryWrites=true&w=majority"
+        "mongodb+srv://koolp:adminadmin@cluster0.o5k4k.mongodb.net/neuro_defense_db?retryWrites=true&w=majority"
     ).strip()
 
 def mean(arr: List[float]) -> float:
@@ -55,7 +55,7 @@ def normalize_doc(doc: Dict[str, Any], source_col: str) -> Optional[Dict[str, An
     if not p_id:
         return None
 
-    p_id = str(p_id).strip().toUpperCase() if hasattr(str(p_id), "toUpperCase") else str(p_id).strip().upper()
+    p_id = str(p_id).strip().upper()
 
     template = doc.get("template") or doc.get("baseline_vector") or doc.get("vector") or doc.get("features")
     variances = doc.get("variances")
@@ -156,12 +156,19 @@ def extract_features(round_data: Dict[str, Any], cognitive: Optional[Dict[str, A
     if cognitive:
         fam_flights = cognitive.get("familiar", {}).get("flight_times", [])
         unfam_flights = cognitive.get("unfamiliar", {}).get("flight_times", [])
-        f.append(mean(fam_flights) / 600.0 if fam_flights else 0.35)
-        f.append(mean(unfam_flights) / 900.0 if unfam_flights else 0.55)
-
-        fam_m = mean(fam_flights) if fam_flights else 200.0
-        unfam_m = mean(unfam_flights) if unfam_flights else 400.0
-        f.append(fam_m / unfam_m if unfam_m > 0 else 0.50)
+        
+        fam_val = mean(fam_flights) / 600.0 if fam_flights else 0.35
+        f.append(fam_val)
+        
+        if unfam_flights:
+            unfam_val = mean(unfam_flights) / 900.0
+            f.append(unfam_val)
+            fam_m = mean(fam_flights) if fam_flights else 200.0
+            unfam_m = mean(unfam_flights) if unfam_flights else 400.0
+            f.append(fam_m / unfam_m if unfam_m > 0 else 0.50)
+        else:
+            # When in single-stage verification (no novel PIN prompt), preserve ratio balance
+            f.extend([fam_val * 1.3, 0.50])
 
         fam_vel = cognitive.get("familiar", {}).get("mean_velocities", [])
         f.append(mean(fam_vel) / 1.5 if fam_vel else 0.45)
@@ -174,7 +181,8 @@ def build_biometric_template(vectors: List[List[float]]) -> (List[float], List[f
     num_dims = len(vectors[0]) if vectors else 28
     template: List[float] = []
     variances: List[float] = []
-    epsilon = 0.008
+    # Epsilon regularization to accommodate intra-user physiological variance
+    epsilon = 0.022
 
     for d in range(num_dims):
         vals = [v[d] for v in vectors if d < len(v) and not math.isnan(v[d])]
@@ -191,14 +199,14 @@ FEATURE_WEIGHTS = np.array([
     1.4, 1.4, 1.4, 1.4, # Reaction times
     1.2, 1.2, 1.2, 1.2, # ITIs
     2.0, 1.8,           # Dwell Duration & Variance
-    1.3, 1.5, 1.3, 1.5, # Spatial accuracy offsets & variances
-    1.1,                # Error rate
-    1.7, 1.5,           # Path efficiency & jitter
-    2.2, 2.0,           # Velocities (mean & peak)
-    2.2, 2.2,           # Acceleration & Neuromuscular Jerk
-    1.8,                # Curvature
-    1.6,                # Overshoots
-    1.7,                # Time-to-peak ratio
+    1.2, 1.3, 1.2, 1.3, # Spatial accuracy offsets & variances
+    1.0,                # Error rate
+    1.5, 1.3,           # Path efficiency & jitter
+    1.8, 1.6,           # Velocities (mean & peak)
+    1.8, 1.8,           # Acceleration & Neuromuscular Jerk
+    1.5,                # Curvature
+    1.4,                # Overshoots
+    1.4,                # Time-to-peak ratio
     1.6, 1.6, 1.8, 1.5  # Cognitive flight & ratio
 ])
 
@@ -210,14 +218,15 @@ def compute_biometric_distance(live_vector: List[float], template: List[float], 
 
     for d in range(n):
         diff = live_vector[d] - template[d]
-        var = max(0.002, variances[d])
+        var = max(0.015, variances[d] if d < len(variances) else 0.025)
         w = FEATURE_WEIGHTS[d]
-        dist_sq = (diff ** 2) / var
+        # Soft-cap extreme single-dimension noise spikes
+        dist_sq = min(16.0, (diff ** 2) / var)
         weighted_sum_sq += w * dist_sq
         total_weight += w
         dim_scores.append(round(math.sqrt(dist_sq), 2))
 
-    norm_dist = math.sqrt(weighted_sum_sq / total_weight) * 3.5
+    norm_dist = math.sqrt(weighted_sum_sq / total_weight) * 2.2
     return round(norm_dist, 2), {"dim_scores": dim_scores}
 
 def sync_from_mongodb(force: bool = False) -> Dict[str, Any]:
@@ -429,6 +438,9 @@ async def enroll_protocol(payload: Dict[str, Any]):
     saved_to_mongo = False
     if mongo_db is not None:
         try:
+            # Ensure connection is active
+            if mongo_client is not None:
+                mongo_client.admin.command('ping')
             mongo_db["operatives"].update_one(
                 {"participant_id": p_id},
                 {"$set": {
@@ -444,8 +456,29 @@ async def enroll_protocol(payload: Dict[str, Any]):
                 upsert=True
             )
             saved_to_mongo = True
+            print(f"[MONGODB ENROLL] Operative {p_id} successfully persisted to {mongo_db.name}.operatives")
         except Exception as e:
-            print(f"MongoDB write error: {e}")
+            print(f"[MONGODB ENROLL ERROR] {e}")
+            try:
+                fresh_client = pymongo.MongoClient(get_mongo_uri(), serverSelectionTimeoutMS=5000)
+                target_db = fresh_client["neuro_defense_db"]
+                target_db["operatives"].update_one(
+                    {"participant_id": p_id},
+                    {"$set": {
+                        "participant_id": p_id,
+                        "enrolled_at": profile["enrolled_at"],
+                        "template": template,
+                        "variances": variances,
+                        "rounds_count": len(rounds),
+                        "raw_rounds": rounds,
+                        "cognitive_data": cognitive_data,
+                        "updated_at": datetime.utcnow().isoformat()
+                    }},
+                    upsert=True
+                )
+                saved_to_mongo = True
+            except Exception as e2:
+                print(f"[MONGODB RETRY ERROR] {e2}")
 
     return {
         "success": True,
@@ -474,10 +507,14 @@ async def verify_protocol(payload: Dict[str, Any]):
     live_vector = extract_features(rounds[0], cognitive_data)
 
     distance, details = compute_biometric_distance(live_vector, profile["template"], profile["variances"])
-    threshold = 3.2
+    threshold = 3.6
     is_match = distance <= threshold
 
-    confidence = round(max(0.0, min(100.0, 100.0 - (distance / threshold * 50.0))), 1)
+    # Calibrated confidence score curve
+    if is_match:
+        confidence = round(max(55.0, min(99.2, 100.0 - ((distance / threshold) ** 1.3) * 45.0)), 1)
+    else:
+        confidence = round(max(4.0, min(48.0, 50.0 - (distance - threshold) * 15.0)), 1)
 
     # Log verification attempt to MongoDB
     if mongo_db is not None:
